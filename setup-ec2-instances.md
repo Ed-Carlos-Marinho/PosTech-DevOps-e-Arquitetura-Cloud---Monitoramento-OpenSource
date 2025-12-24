@@ -1,0 +1,337 @@
+# Setup de Instâncias EC2 para Zabbix
+
+Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para instalar o Zabbix Agent.
+
+## Arquitetura
+
+- **Instância 1**: Zabbix Server (com user data)
+- **Instância 2**: Host monitorado (Zabbix Agent)
+
+## Pré-requisitos
+
+- Conta AWS ativa
+- Key Pair criado
+- VPC e Subnet configuradas
+
+# Setup de Instâncias EC2 para Zabbix
+
+Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para instalar o Zabbix Agent.
+
+## Arquitetura
+
+- **Instância 1**: Zabbix Server (com user data)
+- **Instância 2**: Host monitorado (Zabbix Agent)
+
+## Pré-requisitos
+
+- Conta AWS ativa
+- Key Pair criado
+- VPC e Subnet configuradas
+
+## Passo 1: Criar IAM Role para SSM
+
+### Via Console AWS
+
+1. **IAM Dashboard** → **Roles** → **Create role**
+
+2. **Trusted entity type:**
+   - AWS service
+   - Use case: EC2
+
+3. **Add permissions:**
+   - Buscar e selecionar: `AmazonSSMManagedInstanceCore`
+
+4. **Role details:**
+   - Role name: `PosTech-DevOps-Monitoramento-Role`
+   - Description: `Role para acesso SSM às instâncias EC2 - PosTech DevOps`
+
+5. **Create role**
+
+### Via AWS CLI
+```bash
+# Criar policy de confiança
+cat > trust-policy.json << 'EOF'
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "ec2.amazonaws.com"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+EOF
+
+# Criar role
+aws iam create-role \
+  --role-name PosTech-DevOps-Monitoramento-Role \
+  --assume-role-policy-document file://trust-policy.json
+
+# Anexar policy do SSM
+aws iam attach-role-policy \
+  --role-name PosTech-DevOps-Monitoramento-Role \
+  --policy-arn arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+# Criar instance profile
+aws iam create-instance-profile --instance-profile-name PosTech-DevOps-Monitoramento-Profile
+
+# Adicionar role ao instance profile
+aws iam add-role-to-instance-profile \
+  --instance-profile-name PosTech-DevOps-Monitoramento-Profile \
+  --role-name PosTech-DevOps-Monitoramento-Role
+```
+
+## Passo 2: Criar Security Groups
+
+### Security Group para Zabbix Server
+```bash
+# Nome: zabbix-server-sg
+# Descrição: Security group para Zabbix Server
+```
+
+**Regras de entrada:**
+- SSH (22) - Source: Seu IP
+- HTTP (80) - Source: 0.0.0.0/0 (code-server)
+- Custom TCP (8080) - Source: 0.0.0.0/0 (Zabbix web)
+- Custom TCP (10051) - Source: VPC CIDR (Zabbix server)
+
+### Security Group para Zabbix Agent
+```bash
+# Nome: zabbix-agent-sg
+# Descrição: Security group para hosts monitorados
+```
+
+**Regras de entrada:**
+- SSH (22) - Source: Seu IP
+- Custom TCP (10050) - Source: Security Group do Zabbix Server ou IP do Zabbix Server
+
+## Passo 3: Criar Instância do Zabbix Server
+
+### Via Console AWS
+
+1. **EC2 Dashboard** → **Launch Instance**
+
+2. **Configurações básicas:**
+   - Name: `zabbix-server`
+   - AMI: Ubuntu Server 24.04 LTS
+   - Instance type: t4g.small
+   - Key pair: Selecione sua chave
+
+3. **Network settings:**
+   - VPC: Default ou sua VPC
+   - Subnet: Pública
+   - Auto-assign public IP: Enable
+   - Security group: `zabbix-server-sg`
+
+4. **Advanced details:**
+   - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
+   - User data: Cole o conteúdo do `ec2-userdata-demo.sh`
+
+5. **Launch instance**
+
+### Via AWS CLI
+```bash
+aws ec2 run-instances \
+  --image-id ami-0c7217cdde317cfec \
+  --instance-type t4g.small \
+  --key-name sua-chave \
+  --security-group-ids sg-xxxxxxxxx \
+  --subnet-id subnet-xxxxxxxxx \
+  --associate-public-ip-address \
+  --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
+  --user-data file://ec2-userdata-demo.sh \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=zabbix-server}]'
+```
+
+## Passo 4: Criar Instância para Zabbix Agent
+
+### Via Console AWS
+
+1. **EC2 Dashboard** → **Launch Instance**
+
+2. **Configurações básicas:**
+   - Name: `zabbix-agent-host`
+   - AMI: Ubuntu Server 24.04 LTS
+   - Instance type: t4g.small
+   - Key pair: Selecione sua chave
+
+3. **Network settings:**
+   - VPC: Mesma do Zabbix Server
+   - Subnet: Mesma ou diferente (mesma AZ recomendada)
+   - Auto-assign public IP: Enable
+   - Security group: `zabbix-agent-sg`
+
+4. **Advanced details:**
+   - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
+
+5. **Launch instance** (sem user data)
+
+### Via AWS CLI
+```bash
+aws ec2 run-instances \
+  --image-id ami-0c7217cdde317cfec \
+  --instance-type t4g.small \
+  --key-name sua-chave \
+  --security-group-ids sg-yyyyyyyyy \
+  --subnet-id subnet-xxxxxxxxx \
+  --associate-public-ip-address \
+  --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=zabbix-agent-host}]'
+```
+
+## Passo 5: Verificar Zabbix Server
+
+### Aguardar inicialização (5-10 minutos)
+
+### Verificar serviços
+```bash
+# Conectar via SSH
+ssh -i sua-chave.pem ubuntu@IP_ZABBIX_SERVER
+
+# OU conectar via SSM (sem necessidade de SSH)
+aws ssm start-session --target i-1234567890abcdef0
+
+# Verificar user data
+sudo tail -f /var/log/user-data.log
+
+# Verificar code-server
+sudo systemctl status code-server
+
+# Verificar Docker
+docker --version
+docker-compose --version
+```
+
+### Acessar interfaces
+- **Code-server**: `http://IP_ZABBIX_SERVER` (senha: demo123)
+
+## Passo 6: Instalar Zabbix Agent na segunda instância
+
+### Conectar na instância agent
+```bash
+# Via SSH
+ssh -i sua-chave.pem ubuntu@IP_AGENT_HOST
+
+# OU via SSM (recomendado)
+aws ssm start-session --target i-0987654321fedcba0
+```
+
+### Instalar Zabbix Agent
+```bash
+# Baixar Zabbix Agent 7.4.6 (binário estático)
+wget https://cdn.zabbix.com/zabbix/binaries/stable/7.4/7.4.6/zabbix_agent-7.4.6-linux-3.0-amd64-static.tar.gz
+
+# Extrair o arquivo
+tar -xzf zabbix_agent-7.4.6-linux-3.0-amd64-static.tar.gz
+
+# Criar usuário zabbix
+sudo useradd --system --shell /bin/false zabbix
+
+# Criar diretórios necessários
+sudo mkdir -p /etc/zabbix
+sudo mkdir -p /var/log/zabbix
+sudo mkdir -p /var/run/zabbix
+
+# Copiar binários
+sudo cp bin/zabbix_agentd /usr/local/bin/
+sudo chmod +x /usr/local/bin/zabbix_agentd
+
+# Criar arquivo de configuração
+sudo tee /etc/zabbix/zabbix_agentd.conf > /dev/null << 'EOF'
+PidFile=/var/run/zabbix/zabbix_agentd.pid
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=0
+Server=IP_PRIVADO_ZABBIX_SERVER
+ServerActive=IP_PRIVADO_ZABBIX_SERVER
+Hostname=zabbix-agent-host
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+EOF
+
+# Ajustar permissões
+sudo chown -R zabbix:zabbix /var/log/zabbix
+sudo chown -R zabbix:zabbix /var/run/zabbix
+sudo chown zabbix:zabbix /etc/zabbix/zabbix_agentd.conf
+```
+
+### Configuração do Agent
+```bash
+# Editar configuração (substituir IP_PRIVADO_ZABBIX_SERVER pelo IP real)
+sudo nano /etc/zabbix/zabbix_agentd.conf
+
+# Ou usar sed para substituir automaticamente:
+sudo sed -i 's/IP_PRIVADO_ZABBIX_SERVER/10.0.1.100/g' /etc/zabbix/zabbix_agentd.conf
+```
+
+### Iniciar serviço
+```bash
+# Criar serviço systemd
+sudo tee /etc/systemd/system/zabbix-agent.service > /dev/null << 'EOF'
+[Unit]
+Description=Zabbix Agent
+After=network.target
+
+[Service]
+Type=forking
+User=zabbix
+Group=zabbix
+ExecStart=/usr/local/bin/zabbix_agentd -c /etc/zabbix/zabbix_agentd.conf
+ExecReload=/bin/kill -HUP $MAINPID
+PIDFile=/var/run/zabbix/zabbix_agentd.pid
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Recarregar systemd e iniciar serviço
+sudo systemctl daemon-reload
+sudo systemctl enable zabbix-agent
+sudo systemctl start zabbix-agent
+sudo systemctl status zabbix-agent
+```
+
+## Passo 7: Configurar monitoramento no Zabbix
+
+1. **Acessar Zabbix Web**: `http://IP_ZABBIX_SERVER:8080`
+2. **Login**: Admin / zabbix
+3. **Configuration** → **Hosts** → **Create host**
+4. **Configurar host:**
+   - Host name: `zabbix-agent-host`
+   - Visible name: `Agent Host`
+   - Groups: `Linux servers`
+   - Interfaces: Agent - IP_PRIVADO_AGENT_HOST:10050
+5. **Templates**: Link `Linux by Zabbix agent`
+6. **Add**
+
+## Verificação final
+
+### No Zabbix Server
+- Hosts devem aparecer como "Available" em alguns minutos
+- Métricas começam a ser coletadas automaticamente
+
+### Comandos úteis
+```bash
+# Testar conectividade do server para agent
+telnet IP_AGENT_HOST 10050
+
+# Ver logs do Zabbix Agent
+sudo tail -f /var/log/zabbix/zabbix_agentd.log
+
+# Testar configuração do agent
+sudo -u zabbix /usr/local/bin/zabbix_agentd -t system.cpu.load[all,avg1] -c /etc/zabbix/zabbix_agentd.conf
+```
+
+## Troubleshooting
+
+### Agent não conecta
+- Verificar Security Groups
+- Confirmar IPs privados na configuração
+- Verificar logs: `/var/log/zabbix/zabbix_agentd.log`
+
+### Zabbix Server não inicia
+- Verificar logs: `docker-compose logs zabbix-server`
+- Verificar recursos da instância
+- Aguardar inicialização completa do MySQL
