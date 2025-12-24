@@ -95,27 +95,28 @@ aws iam add-role-to-instance-profile \
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
 - HTTP (80) - Source: 0.0.0.0/0 (code-server)
-- Custom TCP (8080) - Source: 0.0.0.0/0 (Zabbix web)
-- Custom TCP (10051) - Source: VPC CIDR (Zabbix server)
+- Custom TCP (9090) - Source: 0.0.0.0/0 (Prometheus web)
+- Custom TCP (9093) - Source: 0.0.0.0/0 (Alertmanager web)
 
-### Security Group para Zabbix Agent
+### Security Group para Exporters
 ```bash
-# Nome: zabbix-agent-sg
-# Descrição: Security group para hosts monitorados
+# Nome: prometheus-exporters-sg
+# Descrição: Security group para instâncias com exporters
 ```
 
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
-- Custom TCP (10050) - Source: Security Group do Zabbix Server ou IP do Zabbix Server
+- Custom TCP (9100) - Source: Security Group do Prometheus Server (Node Exporter)
+- Custom TCP (8080) - Source: Security Group do Prometheus Server (cAdvisor)
 
-## Passo 3: Criar Instância do Zabbix Server
+## Passo 3: Criar Instância do Prometheus Server
 
 ### Via Console AWS
 
 1. **EC2 Dashboard** → **Launch Instance**
 
 2. **Configurações básicas:**
-   - Name: `zabbix-server`
+   - Name: `prometheus-server`
    - AMI: Ubuntu Server 24.04 LTS
    - Instance type: t4g.small
    - Key pair: Selecione sua chave
@@ -124,7 +125,7 @@ aws iam add-role-to-instance-profile \
    - VPC: Default ou sua VPC
    - Subnet: Pública
    - Auto-assign public IP: Enable
-   - Security group: `zabbix-server-sg`
+   - Security group: `prometheus-server-sg`
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
@@ -143,26 +144,26 @@ aws ec2 run-instances \
   --associate-public-ip-address \
   --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
   --user-data file://ec2-userdata-demo.sh \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=zabbix-server}]'
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=prometheus-server}]'
 ```
 
-## Passo 4: Criar Instância para Zabbix Agent
+## Passo 4: Criar Instância para Exporters
 
 ### Via Console AWS
 
 1. **EC2 Dashboard** → **Launch Instance**
 
 2. **Configurações básicas:**
-   - Name: `zabbix-agent-host`
+   - Name: `prometheus-exporters-host`
    - AMI: Ubuntu Server 24.04 LTS
    - Instance type: t4g.small
    - Key pair: Selecione sua chave
 
 3. **Network settings:**
-   - VPC: Mesma do Zabbix Server
+   - VPC: Mesma do Prometheus Server
    - Subnet: Mesma ou diferente (mesma AZ recomendada)
    - Auto-assign public IP: Enable
-   - Security group: `zabbix-agent-sg`
+   - Security group: `prometheus-exporters-sg`
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
@@ -179,17 +180,17 @@ aws ec2 run-instances \
   --subnet-id subnet-xxxxxxxxx \
   --associate-public-ip-address \
   --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=zabbix-agent-host}]'
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=prometheus-exporters-host}]'
 ```
 
-## Passo 5: Verificar Zabbix Server
+## Passo 5: Verificar Prometheus Server
 
 ### Aguardar inicialização (5-10 minutos)
 
 ### Verificar serviços
 ```bash
 # Conectar via SSH
-ssh -i sua-chave.pem ubuntu@IP_ZABBIX_SERVER
+ssh -i sua-chave.pem ubuntu@IP_PROMETHEUS_SERVER
 
 # OU conectar via SSM (sem necessidade de SSH)
 aws ssm start-session --target i-1234567890abcdef0
@@ -206,132 +207,84 @@ docker-compose --version
 ```
 
 ### Acessar interfaces
-- **Code-server**: `http://IP_ZABBIX_SERVER` (senha: demo123)
+- **Code-server**: `http://IP_PROMETHEUS_SERVER` (senha: demo123)
+- **Prometheus**: Após executar `docker-compose up -d` → `http://IP_PROMETHEUS_SERVER:9090`
+- **Alertmanager**: `http://IP_PROMETHEUS_SERVER:9093`
 
-## Passo 6: Instalar Zabbix Agent na segunda instância
+## Passo 6: Instalar Exporters na segunda instância
 
-### Conectar na instância agent
+### Conectar na instância exporters
 ```bash
 # Via SSH
-ssh -i sua-chave.pem ubuntu@IP_AGENT_HOST
+ssh -i sua-chave.pem ubuntu@IP_EXPORTERS_HOST
 
 # OU via SSM (recomendado)
 aws ssm start-session --target i-0987654321fedcba0
 ```
 
-### Instalar Zabbix Agent
-```bash
-# Baixar Zabbix Agent 7.4.6 (binário estático)
-wget https://cdn.zabbix.com/zabbix/binaries/stable/7.4/7.4.6/zabbix_agent-7.4.6-linux-3.0-amd64-static.tar.gz
+### Instalar Node Exporter e cAdvisor
+Siga o guia detalhado em `exporters-installation.md` para:
+- Instalar Node Exporter (porta 9100)
+- Instalar cAdvisor (porta 8080)
+- Configurar como serviços systemd
+- Verificar funcionamento
 
-# Extrair o arquivo
-tar -xzf zabbix_agent-7.4.6-linux-3.0-amd64-static.tar.gz
+## Passo 7: Configurar monitoramento no Prometheus
 
-# Criar usuário zabbix
-sudo useradd --system --shell /bin/false zabbix
+### Atualizar configuração
+1. **Editar prometheus.yml** na instância do Prometheus Server
+2. **Substituir IPs** pelos IPs privados reais das instâncias
+3. **Recarregar configuração**: `docker-compose restart prometheus`
 
-# Criar diretórios necessários
-sudo mkdir -p /etc/zabbix
-sudo mkdir -p /var/log/zabbix
-sudo mkdir -p /var/run/zabbix
+### Verificar targets
+1. **Acessar Prometheus Web**: `http://IP_PROMETHEUS_SERVER:9090`
+2. **Status** → **Targets**
+3. **Verificar** se todos os exporters estão "UP"
 
-# Copiar binários
-sudo cp bin/zabbix_agentd /usr/local/bin/
-sudo chmod +x /usr/local/bin/zabbix_agentd
-
-# Criar arquivo de configuração
-sudo tee /etc/zabbix/zabbix_agentd.conf > /dev/null << 'EOF'
-PidFile=/var/run/zabbix/zabbix_agentd.pid
-LogFile=/var/log/zabbix/zabbix_agentd.log
-LogFileSize=0
-Server=IP_PRIVADO_ZABBIX_SERVER
-ServerActive=IP_PRIVADO_ZABBIX_SERVER
-Hostname=zabbix-agent-host
-Include=/etc/zabbix/zabbix_agentd.d/*.conf
-EOF
-
-# Ajustar permissões
-sudo chown -R zabbix:zabbix /var/log/zabbix
-sudo chown -R zabbix:zabbix /var/run/zabbix
-sudo chown zabbix:zabbix /etc/zabbix/zabbix_agentd.conf
-```
-
-### Configuração do Agent
-```bash
-# Editar configuração (substituir IP_PRIVADO_ZABBIX_SERVER pelo IP real)
-sudo nano /etc/zabbix/zabbix_agentd.conf
-
-# Ou usar sed para substituir automaticamente:
-sudo sed -i 's/IP_PRIVADO_ZABBIX_SERVER/10.0.1.100/g' /etc/zabbix/zabbix_agentd.conf
-```
-
-### Iniciar serviço
-```bash
-# Criar serviço systemd
-sudo tee /etc/systemd/system/zabbix-agent.service > /dev/null << 'EOF'
-[Unit]
-Description=Zabbix Agent
-After=network.target
-
-[Service]
-Type=forking
-User=zabbix
-Group=zabbix
-ExecStart=/usr/local/bin/zabbix_agentd -c /etc/zabbix/zabbix_agentd.conf
-ExecReload=/bin/kill -HUP $MAINPID
-PIDFile=/var/run/zabbix/zabbix_agentd.pid
-Restart=on-failure
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Recarregar systemd e iniciar serviço
-sudo systemctl daemon-reload
-sudo systemctl enable zabbix-agent
-sudo systemctl start zabbix-agent
-sudo systemctl status zabbix-agent
-```
-
-## Passo 7: Configurar monitoramento no Zabbix
-
-1. **Acessar Zabbix Web**: `http://IP_ZABBIX_SERVER:8080`
-2. **Login**: Admin / zabbix
-3. **Configuration** → **Hosts** → **Create host**
-4. **Configurar host:**
-   - Host name: `zabbix-agent-host`
-   - Visible name: `Agent Host`
-   - Groups: `Linux servers`
-   - Interfaces: Agent - IP_PRIVADO_AGENT_HOST:10050
-5. **Templates**: Link `Linux by Zabbix agent`
-6. **Add**
+### Testar consultas PromQL
+- `up` - Status de todos os targets
+- `node_cpu_seconds_total` - Métricas de CPU
+- `container_memory_usage_bytes` - Métricas de containers
+- `rate(node_cpu_seconds_total[5m])` - Taxa de uso de CPU
 
 ## Verificação final
 
-### No Zabbix Server
-- Hosts devem aparecer como "Available" em alguns minutos
+### No Prometheus Server
+- Targets devem aparecer como "UP" em alguns minutos
 - Métricas começam a ser coletadas automaticamente
+- Alertas configurados começam a funcionar
 
 ### Comandos úteis
 ```bash
-# Testar conectividade do server para agent
-telnet IP_AGENT_HOST 10050
+# Testar conectividade do Prometheus para exporters
+telnet IP_EXPORTERS_HOST 9100
+telnet IP_EXPORTERS_HOST 8080
 
-# Ver logs do Zabbix Agent
-sudo tail -f /var/log/zabbix/zabbix_agentd.log
+# Ver logs dos exporters
+sudo journalctl -u node_exporter -f
+sudo journalctl -u cadvisor -f
 
-# Testar configuração do agent
-sudo -u zabbix /usr/local/bin/zabbix_agentd -t system.cpu.load[all,avg1] -c /etc/zabbix/zabbix_agentd.conf
+# Testar métricas localmente
+curl http://localhost:9100/metrics
+curl http://localhost:8080/metrics
+
+# Verificar configuração do Prometheus
+docker-compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
 ```
 
 ## Troubleshooting
 
-### Agent não conecta
-- Verificar Security Groups
-- Confirmar IPs privados na configuração
-- Verificar logs: `/var/log/zabbix/zabbix_agentd.log`
+### Exporters não conectam
+- Verificar Security Groups (portas 9100 e 8080)
+- Confirmar IPs privados no prometheus.yml
+- Verificar se serviços estão rodando: `systemctl status node_exporter cadvisor`
 
-### Zabbix Server não inicia
-- Verificar logs: `docker-compose logs zabbix-server`
-- Verificar recursos da instância
-- Aguardar inicialização completa do MySQL
+### Prometheus não coleta métricas
+- Verificar logs: `docker-compose logs prometheus`
+- Verificar targets em Status → Targets
+- Testar conectividade de rede entre instâncias
+
+### Alertmanager não funciona
+- Verificar logs: `docker-compose logs alertmanager`
+- Verificar configuração: `/etc/alertmanager/alertmanager.yml`
+- Testar regras de alerta no Prometheus

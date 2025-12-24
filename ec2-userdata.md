@@ -87,4 +87,7 @@ docker-compose --version
 Certifique-se de que o Security Group permite:
 - **SSH (22)**: Para acesso via terminal
 - **HTTP (80)**: Para code-server
-- **8080**: Para interface web do Zabbix
+- **9090**: Para interface web do Prometheus
+- **9093**: Para interface web do Alertmanager
+- **9100**: Para Node Exporter (entre instâncias)
+- **8080**: Para cAdvisor (entre instâncias)
