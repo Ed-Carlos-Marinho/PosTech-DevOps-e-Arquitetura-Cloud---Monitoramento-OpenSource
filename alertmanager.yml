@@ -1,33 +1,92 @@
+# =============================================================================
+# ALERTMANAGER CONFIGURATION
+# =============================================================================
+# Configuração do Alertmanager para gerenciamento e roteamento de alertas
+# Aula 02 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES GLOBAIS
+# -----------------------------------------------------------------------------
 global:
-  smtp_smarthost: 'localhost:587'
-  smtp_from: 'alertmanager@example.com'
+  # Configuração SMTP para envio de emails (ajustar conforme seu provedor)
+  smtp_smarthost: 'localhost:587'              # Servidor SMTP
+  smtp_from: 'alertmanager@example.com'        # Email remetente
+  # smtp_auth_username: 'user@example.com'     # Usuário SMTP (descomente se necessário)
+  # smtp_auth_password: 'password'             # Senha SMTP (descomente se necessário)
 
+# -----------------------------------------------------------------------------
+# ROTEAMENTO DE ALERTAS
+# -----------------------------------------------------------------------------
 route:
-  group_by: ['alertname']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 1h
-  receiver: 'web.hook'
+  group_by: ['alertname']           # Agrupa alertas pelo nome
+  group_wait: 10s                   # Tempo de espera antes de enviar o primeiro alerta do grupo
+  group_interval: 10s               # Tempo entre envios de alertas do mesmo grupo
+  repeat_interval: 1h               # Intervalo para reenvio de alertas não resolvidos
+  receiver: 'web.hook'              # Receptor padrão para todos os alertas
 
+# -----------------------------------------------------------------------------
+# RECEPTORES DE ALERTAS
+# -----------------------------------------------------------------------------
 receivers:
+  
+  # ---------------------------------------------------------------------------
+  # WEBHOOK RECEIVER (Padrão para desenvolvimento/teste)
+  # ---------------------------------------------------------------------------
   - name: 'web.hook'
     webhook_configs:
-      - url: 'http://127.0.0.1:5001/'
-        send_resolved: true
-
+      - url: 'http://127.0.0.1:5001/'           # URL do webhook (ajustar conforme necessário)
+        send_resolved: true                     # Envia notificação quando alerta é resolvido
+        # http_config:                          # Configurações HTTP adicionais (se necessário)
+        #   basic_auth:
+        #     username: 'webhook_user'
+        #     password: 'webhook_password'
+  
+  # ---------------------------------------------------------------------------
+  # EMAIL RECEIVER (Para notificações por email)
+  # ---------------------------------------------------------------------------
   - name: 'email-notifications'
     email_configs:
-      - to: 'admin@example.com'
-        subject: 'Prometheus Alert: {{ .GroupLabels.alertname }}'
-        body: |
+      - to: 'admin@example.com'                 # Email destinatário (AJUSTAR)
+        subject: 'Prometheus Alert: {{ .GroupLabels.alertname }}'  # Assunto do email
+        # Corpo do email com template Go
+        html: |
+          <h2>Alerta Prometheus</h2>
           {{ range .Alerts }}
-          Alert: {{ .Annotations.summary }}
-          Description: {{ .Annotations.description }}
+          <h3>{{ .Annotations.summary }}</h3>
+          <p><strong>Descrição:</strong> {{ .Annotations.description }}</p>
+          <p><strong>Instância:</strong> {{ .Labels.instance }}</p>
+          <p><strong>Severidade:</strong> {{ .Labels.severity }}</p>
+          <p><strong>Status:</strong> {{ .Status }}</p>
+          <hr>
           {{ end }}
 
+# -----------------------------------------------------------------------------
+# REGRAS DE INIBIÇÃO
+# -----------------------------------------------------------------------------
+# Evita spam de alertas relacionados (ex: alerta crítico inibe warnings)
 inhibit_rules:
   - source_match:
-      severity: 'critical'
+      severity: 'critical'              # Se há um alerta crítico...
     target_match:
-      severity: 'warning'
-    equal: ['alertname', 'dev', 'instance']
+      severity: 'warning'               # ...inibe alertas de warning...
+    equal: ['alertname', 'dev', 'instance']  # ...para a mesma instância e alerta
+
+# =============================================================================
+# INSTRUÇÕES DE CONFIGURAÇÃO:
+# =============================================================================
+# 1. Para usar email, configure:
+#    - smtp_smarthost com seu servidor SMTP
+#    - smtp_from com email válido
+#    - Descomente smtp_auth_* se precisar de autenticação
+#    - Ajuste o email em 'to' do receiver 'email-notifications'
+#
+# 2. Para usar webhook, ajuste a URL em web.hook
+#
+# 3. Para testar alertas:
+#    - Acesse http://IP_PROMETHEUS:9093
+#    - Use a interface para criar silenciamentos
+#
+# 4. Para recarregar configuração:
+#    docker-compose restart alertmanager
+# =============================================================================

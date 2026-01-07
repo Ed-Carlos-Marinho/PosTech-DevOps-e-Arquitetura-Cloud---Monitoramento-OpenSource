@@ -1,47 +1,80 @@
+# =============================================================================
+# DOCKER COMPOSE - PROMETHEUS STACK
+# =============================================================================
+# Este arquivo configura uma stack completa de monitoramento com Prometheus
+# e Alertmanager usando Docker Compose para a Aula 02 do curso PosTech DevOps
+# =============================================================================
+
 version: '3.8'
 
 services:
+  # ---------------------------------------------------------------------------
+  # PROMETHEUS SERVER - Servidor principal de monitoramento
+  # ---------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    
+    # Porta de acesso à interface web do Prometheus
     ports:
       - "9090:9090"
+    
+    # Volumes para configuração e dados persistentes
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml
-      - prometheus-data:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml           # Configuração principal
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml        # Regras de alerta
+      - prometheus-data:/prometheus                               # Dados persistentes
+    
+    # Parâmetros de inicialização do Prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
+      - '--config.file=/etc/prometheus/prometheus.yml'           # Arquivo de configuração
+      - '--storage.tsdb.path=/prometheus'                        # Caminho dos dados
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
+      - '--storage.tsdb.retention.time=200h'                     # Retenção de dados: 200 horas
+      - '--web.enable-lifecycle'                                 # Permite reload via API
+      - '--web.enable-admin-api'                                 # Habilita API administrativa
+    
     networks:
       - monitoring
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # ALERTMANAGER - Gerenciador de alertas
+  # ---------------------------------------------------------------------------
   alertmanager:
     image: prom/alertmanager:latest
     container_name: alertmanager
+    
+    # Porta de acesso à interface web do Alertmanager
     ports:
       - "9093:9093"
+    
+    # Volumes para configuração e dados persistentes
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
-      - alertmanager-data:/alertmanager
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml    # Configuração do Alertmanager
+      - alertmanager-data:/alertmanager                          # Dados persistentes
+    
+    # Parâmetros de inicialização do Alertmanager
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
+      - '--config.file=/etc/alertmanager/alertmanager.yml'       # Arquivo de configuração
+      - '--storage.path=/alertmanager'                           # Caminho dos dados
+      - '--web.external-url=http://localhost:9093'               # URL externa (ajustar conforme necessário)
+    
     networks:
       - monitoring
     restart: unless-stopped
 
+# -----------------------------------------------------------------------------
+# VOLUMES PERSISTENTES - Para manter dados entre reinicializações
+# -----------------------------------------------------------------------------
 volumes:
-  prometheus-data:
-  alertmanager-data:
+  prometheus-data:    # Dados do Prometheus (métricas, índices)
+  alertmanager-data:  # Dados do Alertmanager (silenciamentos, estado)
 
+# -----------------------------------------------------------------------------
+# REDES - Rede interna para comunicação entre serviços
+# -----------------------------------------------------------------------------
 networks:
   monitoring:
     driver: bridge
