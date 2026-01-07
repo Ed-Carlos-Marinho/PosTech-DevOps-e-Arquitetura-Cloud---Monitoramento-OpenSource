@@ -29,7 +29,7 @@ docker-compose logs -f
 ```
 
 ### 2. Acessar interface web
-- **URL**: `http://SEU_IP:8080`
+- **URL**: `http://SEU_IP`
 - **Usuário**: `Admin`
 - **Senha**: `zabbix`
 
@@ -49,7 +49,7 @@ docker-compose up -d
 ## Configuração inicial
 
 ### 1. Primeiro acesso
-1. Acesse `http://SEU_IP:8080`
+1. Acesse `http://SEU_IP`
 2. Login: `Admin` / `zabbix`
 3. Altere a senha padrão
 
@@ -65,12 +65,32 @@ docker-compose up -d
 
 ## Portas utilizadas
 
-- **8080**: Interface web Zabbix
+- **80**: Interface web Zabbix
 - **10051**: Zabbix server (comunicação com agentes)
 - **10050**: Zabbix agent local
 - **3306**: MySQL (interno, não exposto)
 
 ## Troubleshooting
+
+### Erro "dbversion table not found"
+Este erro indica que o banco não foi inicializado corretamente. Para corrigir:
+
+```bash
+# Parar todos os serviços
+docker-compose down
+
+# Remover volumes (CUIDADO: apaga todos os dados)
+docker-compose down -v
+
+# Subir apenas o banco primeiro
+docker-compose up -d zabbix-db
+
+# Aguardar o banco estar pronto (verificar logs)
+docker-compose logs -f zabbix-db
+
+# Quando o banco estiver pronto, subir o resto
+docker-compose up -d
+```
 
 ### Serviços não iniciam
 ```bash
@@ -89,6 +109,9 @@ docker-compose ps zabbix-web
 
 # Ver logs do web
 docker-compose logs zabbix-web
+
+# Verificar se Zabbix Server está conectado ao banco
+docker-compose logs zabbix-server | grep -i "database"
 ```
 
 ### Banco de dados

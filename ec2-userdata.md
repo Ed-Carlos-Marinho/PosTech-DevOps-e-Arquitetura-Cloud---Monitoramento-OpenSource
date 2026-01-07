@@ -7,13 +7,13 @@ Script de configuração automática para instâncias EC2 Ubuntu usado na Aula 0
 ### Instalações
 - **Git, curl, htop**: Ferramentas básicas
 - **Docker**: Plataforma de containerização
-- **Docker Compose**: Orquestração de containers
+- **Docker Compose**: Orquestração de containers (versão específica ARM64)
 - **Code-server**: VS Code no navegador
 
 ### Configurações
-- **Code-server**: Porta 80, senha "demo123"
+- **Code-server**: Porta 3000, senha "demo123"
 - **Docker**: Configurado para usuário ubuntu
-- **Firewall**: SSH e HTTP liberados
+- **Firewall**: SSH e porta 3000 liberados
 - **Serviço**: Code-server como systemd service
 
 ## Como usar
@@ -57,7 +57,7 @@ sudo systemctl status code-server
 ```
 
 ### Acesso
-- **Code-server**: `http://SEU_IP`
+- **Code-server**: `http://SEU_IP:3000`
 - **Usuário**: Acesso direto
 - **Senha**: `demo123`
 
@@ -86,5 +86,7 @@ docker-compose --version
 
 Certifique-se de que o Security Group permite:
 - **SSH (22)**: Para acesso via terminal
-- **HTTP (80)**: Para code-server
-- **8080**: Para interface web do Zabbix
+- **HTTP (80)**: Para interface web do Zabbix
+- **3000**: Para code-server
+- **10051**: Para Zabbix Server (entre instâncias)
+- **10050**: Para Zabbix Agent (entre instâncias)

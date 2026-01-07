@@ -4,8 +4,8 @@ Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para inst
 
 ## Arquitetura
 
-- **Instância 1**: Zabbix Server (com user data)
-- **Instância 2**: Host monitorado (Zabbix Agent)
+- **Instância 1**: Zabbix Server (t4g.small - ARM64 com user data)
+- **Instância 2**: Host monitorado (t3.small - AMD64 para Zabbix Agent)
 
 ## Pré-requisitos
 
@@ -13,11 +13,9 @@ Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para inst
 - Key Pair criado
 - VPC e Subnet configuradas
 
-# Setup de Instâncias EC2 para Zabbix
-
-Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para instalar o Zabbix Agent.
-
-## Arquitetura
+**Importante sobre as arquiteturas:**
+- **t4g.small** (ARM64): Para Zabbix Server com Docker
+- **t3.small** (AMD64): Para Zabbix Agent com binários estáticos
 
 - **Instância 1**: Zabbix Server (com user data)
 - **Instância 2**: Host monitorado (Zabbix Agent)
@@ -94,8 +92,8 @@ aws iam add-role-to-instance-profile \
 
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
-- HTTP (80) - Source: 0.0.0.0/0 (code-server)
-- Custom TCP (8080) - Source: 0.0.0.0/0 (Zabbix web)
+- Custom TCP (3000) - Source: 0.0.0.0/0 (code-server)
+- HTTP (80) - Source: 0.0.0.0/0 (Zabbix web)
 - Custom TCP (10051) - Source: VPC CIDR (Zabbix server)
 
 ### Security Group para Zabbix Agent
@@ -155,7 +153,7 @@ aws ec2 run-instances \
 2. **Configurações básicas:**
    - Name: `zabbix-agent-host`
    - AMI: Ubuntu Server 24.04 LTS
-   - Instance type: t4g.small
+   - Instance type: t3.small
    - Key pair: Selecione sua chave
 
 3. **Network settings:**
@@ -173,7 +171,7 @@ aws ec2 run-instances \
 ```bash
 aws ec2 run-instances \
   --image-id ami-0c7217cdde317cfec \
-  --instance-type t4g.small \
+  --instance-type t3.small \
   --key-name sua-chave \
   --security-group-ids sg-yyyyyyyyy \
   --subnet-id subnet-xxxxxxxxx \
@@ -206,7 +204,8 @@ docker-compose --version
 ```
 
 ### Acessar interfaces
-- **Code-server**: `http://IP_ZABBIX_SERVER` (senha: demo123)
+- **Code-server**: `http://IP_ZABBIX_SERVER:3000` (senha: demo123)
+- **Zabbix**: Após executar `docker-compose up -d` → `http://IP_ZABBIX_SERVER` (Admin/zabbix)
 
 ## Passo 6: Instalar Zabbix Agent na segunda instância
 
@@ -221,23 +220,31 @@ aws ssm start-session --target i-0987654321fedcba0
 
 ### Instalar Zabbix Agent
 ```bash
-# Baixar Zabbix Agent 7.4.6 (binário estático)
+# Baixar binário estático do Zabbix Agent 7.4.6 (AMD64)
 wget https://cdn.zabbix.com/zabbix/binaries/stable/7.4/7.4.6/zabbix_agent-7.4.6-linux-3.0-amd64-static.tar.gz
 
-# Extrair o arquivo
+# Extrair arquivos
 tar -xzf zabbix_agent-7.4.6-linux-3.0-amd64-static.tar.gz
 
 # Criar usuário zabbix
 sudo useradd --system --shell /bin/false zabbix
 
 # Criar diretórios necessários
+sudo mkdir -p /usr/local/sbin
 sudo mkdir -p /etc/zabbix
 sudo mkdir -p /var/log/zabbix
 sudo mkdir -p /var/run/zabbix
 
 # Copiar binários
-sudo cp bin/zabbix_agentd /usr/local/bin/
-sudo chmod +x /usr/local/bin/zabbix_agentd
+sudo cp bin/zabbix_agentd /usr/local/sbin/
+sudo cp bin/zabbix_get /usr/local/bin/
+sudo cp bin/zabbix_sender /usr/local/bin/
+
+# Definir permissões
+sudo chown root:root /usr/local/sbin/zabbix_agentd
+sudo chmod 755 /usr/local/sbin/zabbix_agentd
+sudo chown zabbix:zabbix /var/log/zabbix
+sudo chown zabbix:zabbix /var/run/zabbix
 
 # Criar arquivo de configuração
 sudo tee /etc/zabbix/zabbix_agentd.conf > /dev/null << 'EOF'
@@ -250,52 +257,54 @@ Hostname=zabbix-agent-host
 Include=/etc/zabbix/zabbix_agentd.d/*.conf
 EOF
 
-# Ajustar permissões
-sudo chown -R zabbix:zabbix /var/log/zabbix
-sudo chown -R zabbix:zabbix /var/run/zabbix
-sudo chown zabbix:zabbix /etc/zabbix/zabbix_agentd.conf
+# Verificar instalação
+/usr/local/sbin/zabbix_agentd --version
 ```
 
 ### Configuração do Agent
 ```bash
 # Editar configuração (substituir IP_PRIVADO_ZABBIX_SERVER pelo IP real)
-sudo nano /etc/zabbix/zabbix_agentd.conf
+sudo sed -i 's/IP_PRIVADO_ZABBIX_SERVER/SEU_IP_ZABBIX_SERVER_AQUI/' /etc/zabbix/zabbix_agentd.conf
 
-# Ou usar sed para substituir automaticamente:
-sudo sed -i 's/IP_PRIVADO_ZABBIX_SERVER/10.0.1.100/g' /etc/zabbix/zabbix_agentd.conf
-```
-
-### Iniciar serviço
-```bash
 # Criar serviço systemd
 sudo tee /etc/systemd/system/zabbix-agent.service > /dev/null << 'EOF'
 [Unit]
 Description=Zabbix Agent
+After=syslog.target
 After=network.target
 
 [Service]
+Environment="CONFFILE=/etc/zabbix/zabbix_agentd.conf"
 Type=forking
+Restart=on-failure
+PIDFile=/var/run/zabbix/zabbix_agentd.pid
+KillMode=control-group
+ExecStart=/usr/local/sbin/zabbix_agentd -c $CONFFILE
+ExecStop=/bin/kill -SIGTERM $MAINPID
+RestartSec=10s
 User=zabbix
 Group=zabbix
-ExecStart=/usr/local/bin/zabbix_agentd -c /etc/zabbix/zabbix_agentd.conf
-ExecReload=/bin/kill -HUP $MAINPID
-PIDFile=/var/run/zabbix/zabbix_agentd.pid
-Restart=on-failure
 
 [Install]
 WantedBy=multi-user.target
 EOF
+```
 
+### Iniciar serviço
+```bash
 # Recarregar systemd e iniciar serviço
 sudo systemctl daemon-reload
 sudo systemctl enable zabbix-agent
 sudo systemctl start zabbix-agent
 sudo systemctl status zabbix-agent
+
+# Verificar se está rodando
+ps aux | grep zabbix_agentd
 ```
 
 ## Passo 7: Configurar monitoramento no Zabbix
 
-1. **Acessar Zabbix Web**: `http://IP_ZABBIX_SERVER:8080`
+1. **Acessar Zabbix Web**: `http://IP_ZABBIX_SERVER`
 2. **Login**: Admin / zabbix
 3. **Configuration** → **Hosts** → **Create host**
 4. **Configurar host:**
@@ -321,15 +330,44 @@ telnet IP_AGENT_HOST 10050
 sudo tail -f /var/log/zabbix/zabbix_agentd.log
 
 # Testar configuração do agent
-sudo -u zabbix /usr/local/bin/zabbix_agentd -t system.cpu.load[all,avg1] -c /etc/zabbix/zabbix_agentd.conf
+sudo -u zabbix /usr/local/sbin/zabbix_agentd -t system.cpu.load[all,avg1] -c /etc/zabbix/zabbix_agentd.conf
+
+# Verificar versão
+/usr/local/sbin/zabbix_agentd --version
+
+# Verificar se está rodando
+ps aux | grep zabbix_agentd
 ```
 
 ## Troubleshooting
 
+### Zabbix Agent não inicia
+```bash
+# Verificar logs
+sudo journalctl -u zabbix-agent -f
+
+# Verificar status
+sudo systemctl status zabbix-agent
+
+# Testar configuração manualmente
+sudo -u zabbix /usr/local/sbin/zabbix_agentd -t system.cpu.load[all,avg1] -c /etc/zabbix/zabbix_agentd.conf
+
+# Verificar se o binário está no local correto
+ls -la /usr/local/sbin/zabbix_agentd
+
+# Verificar permissões
+ls -la /var/log/zabbix/
+ls -la /var/run/zabbix/
+
+# Verificar arquitetura do binário (deve ser AMD64)
+file /usr/local/sbin/zabbix_agentd
+```
+
 ### Agent não conecta
-- Verificar Security Groups
+- Verificar Security Groups (porta 10050)
 - Confirmar IPs privados na configuração
 - Verificar logs: `/var/log/zabbix/zabbix_agentd.log`
+- Testar conectividade: `telnet IP_ZABBIX_SERVER 10051`
 
 ### Zabbix Server não inicia
 - Verificar logs: `docker-compose logs zabbix-server`
