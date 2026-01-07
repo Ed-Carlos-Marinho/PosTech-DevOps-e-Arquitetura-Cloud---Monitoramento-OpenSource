@@ -1,19 +1,19 @@
 # EC2 User Data Script
 
-Script de configuração automática para instâncias EC2 Ubuntu usado na Aula 01 do módulo Monitoramento OpenSource.
+Script de configuração automática para instâncias EC2 Ubuntu usado na Aula 02 do módulo Monitoramento OpenSource.
 
 ## O que o script faz
 
 ### Instalações
 - **Git, curl, htop**: Ferramentas básicas
 - **Docker**: Plataforma de containerização
-- **Docker Compose**: Orquestração de containers
+- **Docker Compose**: Orquestração de containers (versão específica ARM64)
 - **Code-server**: VS Code no navegador
 
 ### Configurações
-- **Code-server**: Porta 80, senha "demo123"
+- **Code-server**: Porta 8080, senha "demo123"
 - **Docker**: Configurado para usuário ubuntu
-- **Firewall**: SSH e HTTP liberados
+- **Firewall**: SSH, HTTP (80) e porta 8080 liberados
 - **Serviço**: Code-server como systemd service
 
 ## Como usar
@@ -57,7 +57,7 @@ sudo systemctl status code-server
 ```
 
 ### Acesso
-- **Code-server**: `http://SEU_IP`
+- **Code-server**: `http://SEU_IP:8080`
 - **Usuário**: Acesso direto
 - **Senha**: `demo123`
 
@@ -86,8 +86,9 @@ docker-compose --version
 
 Certifique-se de que o Security Group permite:
 - **SSH (22)**: Para acesso via terminal
-- **HTTP (80)**: Para code-server
+- **HTTP (80)**: Para possível interface web adicional
+- **8080**: Para code-server
 - **9090**: Para interface web do Prometheus
 - **9093**: Para interface web do Alertmanager
 - **9100**: Para Node Exporter (entre instâncias)
-- **8080**: Para cAdvisor (entre instâncias)
+- **8080**: Para cAdvisor (entre instâncias) - mesma porta do code-server mas em instâncias diferentes

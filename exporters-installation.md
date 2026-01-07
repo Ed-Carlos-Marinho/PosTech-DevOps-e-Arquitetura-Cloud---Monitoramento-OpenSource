@@ -68,61 +68,76 @@ sudo netstat -tlnp | grep :9100
 
 ## cAdvisor - Métricas de Containers
 
-### Instalação
+### Por que usar cAdvisor em container?
+
+- **Acesso nativo ao Docker**: Acesso direto ao socket e APIs do Docker
+- **Isolamento**: Não interfere no sistema host
+- **Facilidade de gerenciamento**: Mais fácil de atualizar e configurar
+- **Padrão da indústria**: Forma recomendada pela comunidade
+- **Menos dependências**: Não precisa instalar binários no host
+
+### Instalação via Docker Container
 
 ```bash
-# Baixar cAdvisor
-sudo wget https://github.com/google/cadvisor/releases/download/v0.49.1/cadvisor-v0.49.1-linux-amd64 -O /usr/local/bin/cadvisor
-
-# Dar permissões de execução
-sudo chmod +x /usr/local/bin/cadvisor
-
-# Criar usuário para cAdvisor
-sudo useradd --no-create-home --shell /bin/false cadvisor
-```
-
-### Configurar como serviço
-
-```bash
-# Criar arquivo de serviço systemd
-sudo tee /etc/systemd/system/cadvisor.service > /dev/null << 'EOF'
-[Unit]
-Description=cAdvisor
-Wants=network-online.target
-After=network-online.target
-
-[Service]
-User=root
-Group=root
-Type=simple
-ExecStart=/usr/local/bin/cadvisor \
-    --port=8080 \
-    --logtostderr \
-    --v=0 \
-    --docker_only=true
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Recarregar systemd e iniciar serviço
-sudo systemctl daemon-reload
-sudo systemctl enable cadvisor
-sudo systemctl start cadvisor
-sudo systemctl status cadvisor
+# Executar cAdvisor como container Docker
+docker run -d \
+  --name=cadvisor \
+  --restart=unless-stopped \
+  --volume=/:/rootfs:ro \
+  --volume=/var/run:/var/run:ro \
+  --volume=/sys:/sys:ro \
+  --volume=/var/lib/docker/:/var/lib/docker:ro \
+  --volume=/dev/disk/:/dev/disk:ro \
+  --publish=8080:8080 \
+  --privileged \
+  --device=/dev/kmsg \
+  gcr.io/cadvisor/cadvisor:latest
 ```
 
 ### Verificar funcionamento
 
 ```bash
+# Verificar se container está rodando
+docker ps | grep cadvisor
+
 # Testar métricas localmente
 curl http://localhost:8080/metrics
 
 # Verificar se está escutando na porta
 sudo netstat -tlnp | grep :8080
 
-# Acessar interface web (se necessário)
+# Ver logs do container
+docker logs cadvisor
+
+# Acessar interface web (opcional)
 # http://IP_INSTANCIA:8080
+```
+
+### Configurar para iniciar automaticamente
+
+O cAdvisor já está configurado com `--restart=unless-stopped`, mas se quiser garantir que inicie com o sistema:
+
+```bash
+# Criar script de inicialização
+sudo tee /etc/systemd/system/cadvisor-docker.service > /dev/null << 'EOF'
+[Unit]
+Description=cAdvisor Docker Container
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/docker start cadvisor
+ExecStop=/usr/bin/docker stop cadvisor
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Habilitar serviço
+sudo systemctl enable cadvisor-docker
 ```
 
 ## Configurar Security Groups
@@ -208,14 +223,21 @@ sudo -u node_exporter /usr/local/bin/node_exporter
 
 ### cAdvisor não inicia
 ```bash
-# Ver logs
-sudo journalctl -u cadvisor -f
+# Ver logs do container
+docker logs cadvisor
 
 # Verificar se Docker está rodando
 sudo systemctl status docker
 
-# Testar manualmente
-sudo /usr/local/bin/cadvisor --port=8080
+# Verificar se container existe
+docker ps -a | grep cadvisor
+
+# Reiniciar container
+docker restart cadvisor
+
+# Remover e recriar container se necessário
+docker rm -f cadvisor
+# Depois executar novamente o comando docker run
 ```
 
 ### Prometheus não consegue coletar métricas

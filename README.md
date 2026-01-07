@@ -7,7 +7,7 @@ Este repositório contém os materiais da **Aula 02** do módulo **Monitoramento
 ### 1. Script de User Data EC2 (`ec2-userdata-demo.sh`)
 Script automatizado para configuração de instâncias EC2 Ubuntu com:
 - Docker e Docker Compose
-- Code-server (VS Code no navegador) na porta 80
+- Code-server (VS Code no navegador) na porta 8080
 - Configurações básicas de segurança
 
 ### 2. Docker Compose Prometheus (`docker-compose.yml`)
