@@ -180,7 +180,22 @@ aws ec2 run-instances \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=zabbix-agent-host}]'
 ```
 
-## Passo 5: Verificar Zabbix Server
+## Passo 5: Clonar repositório com os arquivos
+
+Após criar as duas instâncias, clone o repositório para ter acesso aos arquivos necessários:
+
+```bash
+git clone -b aula-01 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
+cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
+```
+
+Os arquivos estarão disponíveis:
+- `docker-compose.yml` - Para subir o Zabbix Server
+- `ec2-userdata-demo.sh` - Script usado no user data
+- `setup-ec2-instances.md` - Este guia
+- `zabbix-compose.md` - Documentação do Docker Compose
+
+## Passo 6: Verificar Zabbix Server
 
 ### Aguardar inicialização (5-10 minutos)
 
@@ -207,7 +222,7 @@ docker-compose --version
 - **Code-server**: `http://IP_ZABBIX_SERVER:3000` (senha: demo123)
 - **Zabbix**: Após executar `docker-compose up -d` → `http://IP_ZABBIX_SERVER` (Admin/zabbix)
 
-## Passo 6: Instalar Zabbix Agent na segunda instância
+## Passo 7: Instalar Zabbix Agent na segunda instância
 
 ### Conectar na instância agent
 ```bash
@@ -233,7 +248,7 @@ sudo useradd --system --shell /bin/false zabbix
 sudo mkdir -p /usr/local/sbin
 sudo mkdir -p /etc/zabbix
 sudo mkdir -p /var/log/zabbix
-sudo mkdir -p /var/run/zabbix
+sudo mkdir -p /run/zabbix
 
 # Copiar binários
 sudo cp bin/zabbix_agentd /usr/local/sbin/
@@ -244,17 +259,16 @@ sudo cp bin/zabbix_sender /usr/local/bin/
 sudo chown root:root /usr/local/sbin/zabbix_agentd
 sudo chmod 755 /usr/local/sbin/zabbix_agentd
 sudo chown zabbix:zabbix /var/log/zabbix
-sudo chown zabbix:zabbix /var/run/zabbix
+sudo chown zabbix:zabbix /run/zabbix
 
 # Criar arquivo de configuração
 sudo tee /etc/zabbix/zabbix_agentd.conf > /dev/null << 'EOF'
-PidFile=/var/run/zabbix/zabbix_agentd.pid
+PidFile=/run/zabbix/zabbix_agentd.pid
 LogFile=/var/log/zabbix/zabbix_agentd.log
 LogFileSize=0
 Server=IP_PRIVADO_ZABBIX_SERVER
 ServerActive=IP_PRIVADO_ZABBIX_SERVER
 Hostname=zabbix-agent-host
-Include=/etc/zabbix/zabbix_agentd.d/*.conf
 EOF
 
 # Verificar instalação
@@ -277,7 +291,7 @@ After=network.target
 Environment="CONFFILE=/etc/zabbix/zabbix_agentd.conf"
 Type=forking
 Restart=on-failure
-PIDFile=/var/run/zabbix/zabbix_agentd.pid
+PIDFile=/run/zabbix/zabbix_agentd.pid
 KillMode=control-group
 ExecStart=/usr/local/sbin/zabbix_agentd -c $CONFFILE
 ExecStop=/bin/kill -SIGTERM $MAINPID
@@ -302,7 +316,7 @@ sudo systemctl status zabbix-agent
 ps aux | grep zabbix_agentd
 ```
 
-## Passo 7: Configurar monitoramento no Zabbix
+## Passo 8: Configurar monitoramento no Zabbix
 
 1. **Acessar Zabbix Web**: `http://IP_ZABBIX_SERVER`
 2. **Login**: Admin / zabbix

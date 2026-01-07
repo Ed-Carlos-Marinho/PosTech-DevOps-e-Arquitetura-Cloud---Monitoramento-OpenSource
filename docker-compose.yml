@@ -70,6 +70,9 @@ services:
       zabbix-db:
         condition: service_healthy
     restart: unless-stopped
+    command: >
+      sh -c "sleep 20 && 
+             /usr/bin/docker-entrypoint.sh"
 
   zabbix-agent:
     image: zabbix/zabbix-agent:latest

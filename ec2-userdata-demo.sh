@@ -56,7 +56,7 @@ fi
 echo "⚙️ Configurando code-server..."
 mkdir -p /home/ubuntu/.config/code-server
 cat > /home/ubuntu/.config/code-server/config.yaml << 'EOF'
-bind-addr: 0.0.0.0:3000
+bind-addr: 0.0.0.0:8080
 auth: password
 password: demo123
 cert: false
@@ -96,7 +96,8 @@ check_status "Inicialização do code-server"
 echo "🔥 Configurando firewall..."
 ufw --force enable
 ufw allow ssh
-ufw allow 3000
+ufw allow http
+ufw allow 8080
 check_status "Configuração do firewall"
 
 # Verificar status dos serviços
@@ -106,6 +107,6 @@ systemctl is-active code-server && echo "✅ Code-server está rodando"
 
 # Finalizar
 echo "=== ✅ Configuração concluída com sucesso em $(date) ==="
-echo "🌐 Code-server disponível em: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000"
+echo "🌐 Code-server disponível em: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
 echo "🔑 Senha: demo123"
 echo "🐳 Docker e Docker Compose instalados e configurados"
