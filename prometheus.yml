@@ -1,25 +1,91 @@
+# =============================================================================
+# PROMETHEUS CONFIGURATION - AULA 03
+# =============================================================================
+# Configuração do Prometheus para integração com Grafana
+# Aula 03 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Foco: Data source para dashboards dinâmicos no Grafana
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES GLOBAIS
+# -----------------------------------------------------------------------------
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 15s      # Intervalo padrão para coleta de métricas (15 segundos)
+  evaluation_interval: 15s  # Intervalo para avaliação de regras de alerta (15 segundos)
 
+# -----------------------------------------------------------------------------
+# ARQUIVOS DE REGRAS DE ALERTA
+# -----------------------------------------------------------------------------
 rule_files:
-  - "alert_rules.yml"
+  - "alert_rules.yml"       # Arquivo contendo as regras de alerta personalizadas
 
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÃO DO ALERTMANAGER
+# -----------------------------------------------------------------------------
 alerting:
   alertmanagers:
     - static_configs:
         - targets:
-          - alertmanager:9093
+          - alertmanager:9093   # Endereço do Alertmanager (nome do container Docker)
 
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÃO DE COLETA DE MÉTRICAS (SCRAPE CONFIGS)
+# -----------------------------------------------------------------------------
 scrape_configs:
+  
+  # ---------------------------------------------------------------------------
+  # JOB 1: PROMETHEUS (Auto-monitoramento)
+  # ---------------------------------------------------------------------------
   - job_name: 'prometheus'
     static_configs:
-      - targets: ['localhost:9090']
-
+      - targets: ['localhost:9090']    # O próprio Prometheus se monitora
+    # Métricas disponíveis para Grafana: prometheus_*, go_*, process_*
+  
+  # ---------------------------------------------------------------------------
+  # JOB 2: NODE EXPORTER (Métricas do sistema operacional)
+  # ---------------------------------------------------------------------------
+  # IMPORTANTE: Substitua IP_INSTANCIA_X pelos IPs privados reais das instâncias
   - job_name: 'node-exporter'
     static_configs:
       - targets: ['IP_INSTANCIA_1:9100', 'IP_INSTANCIA_2:9100']
-
+    # Métricas para dashboards Grafana: node_cpu_*, node_memory_*, node_filesystem_*
+    # Dashboards recomendados: Node Exporter Full (ID: 1860)
+  
+  # ---------------------------------------------------------------------------
+  # JOB 3: CADVISOR (Métricas de containers Docker)
+  # ---------------------------------------------------------------------------
+  # IMPORTANTE: Substitua IP_INSTANCIA_X pelos IPs privados reais das instâncias
   - job_name: 'cadvisor'
     static_configs:
       - targets: ['IP_INSTANCIA_1:8080', 'IP_INSTANCIA_2:8080']
+    # Métricas para dashboards Grafana: container_cpu_*, container_memory_*
+    # Dashboards recomendados: Docker Container & Host Metrics (ID: 179)
+
+# =============================================================================
+# INTEGRAÇÃO COM GRAFANA - AULA 03:
+# =============================================================================
+# 1. Este Prometheus será configurado como Data Source no Grafana
+# 2. URL do Data Source: http://prometheus:9090
+# 3. Dashboards recomendados para importar:
+#    - Node Exporter Full (ID: 1860)
+#    - Docker Container & Host Metrics (ID: 179)
+#    - Prometheus Stats (ID: 2)
+#
+# 4. Métricas principais para dashboards customizados:
+#    - CPU: node_cpu_seconds_total
+#    - Memory: node_memory_MemAvailable_bytes
+#    - Disk: node_filesystem_avail_bytes
+#    - Network: node_network_receive_bytes_total
+#    - Containers: container_cpu_usage_seconds_total
+# =============================================================================
+#
+# INSTRUÇÕES DE CONFIGURAÇÃO:
+# =============================================================================
+# 1. Substitua IP_INSTANCIA_1 e IP_INSTANCIA_2 pelos IPs privados reais
+# 2. Para recarregar a configuração sem reiniciar:
+#    curl -X POST http://localhost:9090/-/reload
+# 3. Para verificar a configuração:
+#    docker-compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+# 4. Para ver targets ativos: http://IP_PROMETHEUS:9090/targets
+# 5. Para testar métricas no Grafana: http://IP_GRAFANA:3000
+# =============================================================================

@@ -1,33 +1,121 @@
+# =============================================================================
+# ALERTMANAGER CONFIGURATION - AULA 03
+# =============================================================================
+# Configuração do Alertmanager para integração com Grafana
+# Aula 03 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Foco: Alertas visuais e notificações personalizadas
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES GLOBAIS
+# -----------------------------------------------------------------------------
 global:
-  smtp_smarthost: 'localhost:587'
-  smtp_from: 'alertmanager@example.com'
+  # Configuração SMTP para envio de emails (ajustar conforme seu provedor)
+  smtp_smarthost: 'localhost:587'              # Servidor SMTP
+  smtp_from: 'alertmanager@example.com'        # Email remetente
+  # smtp_auth_username: 'user@example.com'     # Usuário SMTP (descomente se necessário)
+  # smtp_auth_password: 'password'             # Senha SMTP (descomente se necessário)
 
+# -----------------------------------------------------------------------------
+# ROTEAMENTO DE ALERTAS
+# -----------------------------------------------------------------------------
 route:
-  group_by: ['alertname']
-  group_wait: 10s
-  group_interval: 10s
-  repeat_interval: 1h
-  receiver: 'web.hook'
+  group_by: ['alertname']           # Agrupa alertas pelo nome
+  group_wait: 10s                   # Tempo de espera antes de enviar o primeiro alerta do grupo
+  group_interval: 10s               # Tempo entre envios de alertas do mesmo grupo
+  repeat_interval: 1h               # Intervalo para reenvio de alertas não resolvidos
+  receiver: 'web.hook'              # Receptor padrão para todos os alertas
 
+# -----------------------------------------------------------------------------
+# RECEPTORES DE ALERTAS
+# -----------------------------------------------------------------------------
 receivers:
+  
+  # ---------------------------------------------------------------------------
+  # WEBHOOK RECEIVER (Integração com Grafana e outros sistemas)
+  # ---------------------------------------------------------------------------
   - name: 'web.hook'
     webhook_configs:
-      - url: 'http://127.0.0.1:5001/'
-        send_resolved: true
-
+      - url: 'http://127.0.0.1:5001/'           # URL do webhook (ajustar conforme necessário)
+        send_resolved: true                     # Envia notificação quando alerta é resolvido
+        # Para integração com Grafana OnCall ou outras ferramentas:
+        # - url: 'http://grafana:3000/api/webhooks/alertmanager'
+        # http_config:                          # Configurações HTTP adicionais (se necessário)
+        #   basic_auth:
+        #     username: 'webhook_user'
+        #     password: 'webhook_password'
+  
+  # ---------------------------------------------------------------------------
+  # EMAIL RECEIVER (Para notificações por email)
+  # ---------------------------------------------------------------------------
   - name: 'email-notifications'
     email_configs:
-      - to: 'admin@example.com'
-        subject: 'Prometheus Alert: {{ .GroupLabels.alertname }}'
-        body: |
+      - to: 'admin@example.com'                 # Email destinatário (AJUSTAR)
+        subject: 'Grafana Alert: {{ .GroupLabels.alertname }}'  # Assunto do email
+        # Corpo do email com template Go (compatível com Grafana)
+        html: |
+          <h2>🚨 Alerta do Sistema de Monitoramento</h2>
+          <p><strong>Origem:</strong> Prometheus + Alertmanager + Grafana</p>
           {{ range .Alerts }}
-          Alert: {{ .Annotations.summary }}
-          Description: {{ .Annotations.description }}
+          <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0;">
+            <h3 style="color: {{ if eq .Status "firing" }}red{{ else }}green{{ end }};">
+              {{ .Annotations.summary }}
+            </h3>
+            <p><strong>Descrição:</strong> {{ .Annotations.description }}</p>
+            <p><strong>Instância:</strong> {{ .Labels.instance }}</p>
+            <p><strong>Severidade:</strong> {{ .Labels.severity }}</p>
+            <p><strong>Status:</strong> {{ .Status }}</p>
+            <p><strong>Horário:</strong> {{ .StartsAt.Format "2006-01-02 15:04:05" }}</p>
+          </div>
           {{ end }}
+          <hr>
+          <p><em>Este alerta foi gerado automaticamente pelo sistema de monitoramento.</em></p>
+          <p><strong>Acesse o Grafana:</strong> <a href="http://IP_GRAFANA:3000">Dashboard de Monitoramento</a></p>
 
+# -----------------------------------------------------------------------------
+# REGRAS DE INIBIÇÃO
+# -----------------------------------------------------------------------------
+# Evita spam de alertas relacionados (ex: alerta crítico inibe warnings)
 inhibit_rules:
   - source_match:
-      severity: 'critical'
+      severity: 'critical'              # Se há um alerta crítico...
     target_match:
-      severity: 'warning'
-    equal: ['alertname', 'dev', 'instance']
+      severity: 'warning'               # ...inibe alertas de warning...
+    equal: ['alertname', 'dev', 'instance']  # ...para a mesma instância e alerta
+
+# =============================================================================
+# INTEGRAÇÃO COM GRAFANA - AULA 03:
+# =============================================================================
+# 1. Grafana pode ser configurado como receptor de alertas
+# 2. Alertmanager pode enviar alertas para Grafana OnCall
+# 3. Grafana pode mostrar status do Alertmanager em dashboards
+# 4. Configuração de Data Source no Grafana:
+#    - Type: Alertmanager
+#    - URL: http://alertmanager:9093
+#
+# DASHBOARDS RECOMENDADOS PARA GRAFANA:
+# - Alertmanager Overview (ID: 9578)
+# - Prometheus Alertmanager (ID: 9094)
+# =============================================================================
+#
+# INSTRUÇÕES DE CONFIGURAÇÃO:
+# =============================================================================
+# 1. Para usar email, configure:
+#    - smtp_smarthost com seu servidor SMTP
+#    - smtp_from com email válido
+#    - Descomente smtp_auth_* se precisar de autenticação
+#    - Ajuste o email em 'to' do receiver 'email-notifications'
+#
+# 2. Para integração com Grafana:
+#    - Configure webhook para Grafana OnCall
+#    - Adicione Alertmanager como Data Source no Grafana
+#    - Importe dashboards de monitoramento de alertas
+#
+# 3. Para testar alertas:
+#    - Acesse http://IP_ALERTMANAGER:9093
+#    - Use a interface para criar silenciamentos
+#    - Monitore alertas no Grafana
+#
+# 4. Para recarregar configuração:
+#    docker-compose restart alertmanager
+# =============================================================================

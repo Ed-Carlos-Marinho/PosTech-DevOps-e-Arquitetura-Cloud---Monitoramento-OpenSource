@@ -1,11 +1,18 @@
-# Setup de Instâncias EC2 para Zabbix
+# Setup de Instâncias EC2 para Grafana
 
-Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para instalar o Zabbix Agent.
+Guia para criar duas instâncias EC2: uma para o stack completo de monitoramento (Grafana + Prometheus + Zabbix) e outra para ser monitorada.
 
 ## Arquitetura
 
-- **Instância 1**: Zabbix Server (com user data)
-- **Instância 2**: Host monitorado (Zabbix Agent)
+- **Instância 1**: Stack de Monitoramento (t4g.medium - ARM64 com user data)
+  - Grafana (visualização)
+  - Prometheus (métricas modernas)
+  - Zabbix Server (monitoramento tradicional)
+  - Alertmanager (alertas)
+- **Instância 2**: Host monitorado (t3.small - AMD64 para exporters)
+  - Node Exporter
+  - cAdvisor
+  - Zabbix Agent
 
 ## Pré-requisitos
 
@@ -13,20 +20,9 @@ Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para inst
 - Key Pair criado
 - VPC e Subnet configuradas
 
-# Setup de Instâncias EC2 para Zabbix
-
-Guia para criar duas instâncias EC2: uma para o Zabbix Server e outra para instalar o Zabbix Agent.
-
-## Arquitetura
-
-- **Instância 1**: Zabbix Server (com user data)
-- **Instância 2**: Host monitorado (Zabbix Agent)
-
-## Pré-requisitos
-
-- Conta AWS ativa
-- Key Pair criado
-- VPC e Subnet configuradas
+**Importante sobre as arquiteturas:**
+- **t4g.medium** (ARM64): Para stack completa de monitoramento com Docker (4GB RAM recomendado)
+- **t3.small** (AMD64): Para host monitorado com exporters
 
 ## Passo 1: Criar IAM Role para SSM
 
@@ -86,50 +82,54 @@ aws iam add-role-to-instance-profile \
 
 ## Passo 2: Criar Security Groups
 
-### Security Group para Zabbix Server
+### Security Group para Stack de Monitoramento
 ```bash
-# Nome: zabbix-server-sg
-# Descrição: Security group para Zabbix Server
+# Nome: grafana-monitoring-sg
+# Descrição: Security group para stack completa de monitoramento (Grafana + Prometheus + Zabbix)
 ```
 
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
-- HTTP (80) - Source: 0.0.0.0/0 (code-server)
+- Custom TCP (8080) - Source: 0.0.0.0/0 (code-server)
+- Custom TCP (3000) - Source: 0.0.0.0/0 (Grafana web)
 - Custom TCP (9090) - Source: 0.0.0.0/0 (Prometheus web)
 - Custom TCP (9093) - Source: 0.0.0.0/0 (Alertmanager web)
+- Custom TCP (8080) - Source: 0.0.0.0/0 (Zabbix web)
+- Custom TCP (10051) - Source: VPC CIDR (Zabbix server)
 
 ### Security Group para Exporters
 ```bash
-# Nome: prometheus-exporters-sg
+# Nome: monitoring-exporters-sg
 # Descrição: Security group para instâncias com exporters
 ```
 
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
-- Custom TCP (9100) - Source: Security Group do Prometheus Server (Node Exporter)
-- Custom TCP (8080) - Source: Security Group do Prometheus Server (cAdvisor)
+- Custom TCP (9100) - Source: Security Group da Stack de Monitoramento (Node Exporter)
+- Custom TCP (8080) - Source: Security Group da Stack de Monitoramento (cAdvisor)
+- Custom TCP (10050) - Source: Security Group da Stack de Monitoramento (Zabbix Agent)
 
-## Passo 3: Criar Instância do Prometheus Server
+## Passo 3: Criar Instância da Stack de Monitoramento
 
 ### Via Console AWS
 
 1. **EC2 Dashboard** → **Launch Instance**
 
 2. **Configurações básicas:**
-   - Name: `prometheus-server`
+   - Name: `grafana-monitoring-server`
    - AMI: Ubuntu Server 24.04 LTS
-   - Instance type: t4g.small
+   - Instance type: t4g.medium
    - Key pair: Selecione sua chave
 
 3. **Network settings:**
    - VPC: Default ou sua VPC
    - Subnet: Pública
    - Auto-assign public IP: Enable
-   - Security group: `prometheus-server-sg`
+   - Security group: `grafana-monitoring-sg`
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
-   - User data: Cole o conteúdo do `ec2-userdata-demo.sh`
+   - User data: Cole o conteúdo do `ec2-userdata-instance-01.sh`
 
 5. **Launch instance**
 
@@ -137,14 +137,14 @@ aws iam add-role-to-instance-profile \
 ```bash
 aws ec2 run-instances \
   --image-id ami-0c7217cdde317cfec \
-  --instance-type t4g.small \
+  --instance-type t4g.medium \
   --key-name sua-chave \
   --security-group-ids sg-xxxxxxxxx \
   --subnet-id subnet-xxxxxxxxx \
   --associate-public-ip-address \
   --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
-  --user-data file://ec2-userdata-demo.sh \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=prometheus-server}]'
+  --user-data file://ec2-userdata-instance-01.sh \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=grafana-monitoring-server}]'
 ```
 
 ## Passo 4: Criar Instância para Exporters
@@ -154,19 +154,20 @@ aws ec2 run-instances \
 1. **EC2 Dashboard** → **Launch Instance**
 
 2. **Configurações básicas:**
-   - Name: `prometheus-exporters-host`
+   - Name: `monitored-host-01`
    - AMI: Ubuntu Server 24.04 LTS
-   - Instance type: t4g.small
+   - Instance type: t3.small
    - Key pair: Selecione sua chave
 
 3. **Network settings:**
    - VPC: Mesma do Prometheus Server
    - Subnet: Mesma ou diferente (mesma AZ recomendada)
    - Auto-assign public IP: Enable
-   - Security group: `prometheus-exporters-sg`
+   - Security group: `monitoring-exporters-sg`
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
+   - User data: Cole o conteúdo do `ec2-userdata-instance-02.sh`
 
 5. **Launch instance** (sem user data)
 
@@ -179,11 +180,28 @@ aws ec2 run-instances \
   --security-group-ids sg-yyyyyyyyy \
   --subnet-id subnet-xxxxxxxxx \
   --associate-public-ip-address \
-  --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=prometheus-exporters-host}]'
+  --user-data file://ec2-userdata-instance-02.sh \
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=monitored-host-01}]'
 ```
 
-## Passo 5: Verificar Prometheus Server
+## Passo 5: Clonar repositório com os arquivos
+
+Após criar as duas instâncias, clone o repositório para ter acesso aos arquivos necessários:
+
+```bash
+git clone -b aula-03 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
+cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
+```
+
+Os arquivos estarão disponíveis:
+- `docker-compose.yml` - Para subir a stack completa de monitoramento
+- `ec2-userdata-instance-01.sh` - Script usado no user data da instância 1
+- `ec2-userdata-instance-02.sh` - Script usado no user data da instância 2
+- `prometheus.yml`, `alertmanager.yml`, `alert_rules.yml` - Configurações
+- `setup-ec2-instances.md` - Este guia
+- `grafana-compose.md` - Documentação da stack completa
+
+## Passo 6: Verificar Stack de Monitoramento
 
 ### Aguardar inicialização (5-10 minutos)
 
@@ -207,29 +225,52 @@ docker-compose --version
 ```
 
 ### Acessar interfaces
-- **Code-server**: `http://IP_PROMETHEUS_SERVER` (senha: demo123)
-- **Prometheus**: Após executar `docker-compose up -d` → `http://IP_PROMETHEUS_SERVER:9090`
-- **Alertmanager**: `http://IP_PROMETHEUS_SERVER:9093`
+- **Code-server**: `http://IP_MONITORING_SERVER:8080` (senha: demo123)
+- **Grafana**: `http://IP_MONITORING_SERVER:3000` (admin/admin123)
+- **Prometheus**: `http://IP_MONITORING_SERVER:9090`
+- **Alertmanager**: `http://IP_MONITORING_SERVER:9093`
+- **Zabbix**: `http://IP_MONITORING_SERVER:8080` (Admin/zabbix)
 
-## Passo 6: Instalar Exporters na segunda instância
+## Passo 7: Verificar instância monitorada
 
-### Conectar na instância exporters
+### Conectar na instância monitorada
 ```bash
 # Via SSH
-ssh -i sua-chave.pem ubuntu@IP_EXPORTERS_HOST
+ssh -i sua-chave.pem ubuntu@IP_MONITORED_HOST
 
 # OU via SSM (recomendado)
 aws ssm start-session --target i-0987654321fedcba0
 ```
 
-### Instalar Node Exporter e cAdvisor
-Siga o guia detalhado em `exporters-installation.md` para:
-- Instalar Node Exporter (porta 9100)
-- Instalar cAdvisor (porta 8080)
-- Configurar como serviços systemd
-- Verificar funcionamento
+### Verificar serviços instalados automaticamente
+```bash
+# Verificar user data
+sudo tail -f /var/log/user-data.log
 
-## Passo 7: Configurar monitoramento no Prometheus
+# Verificar Node Exporter
+sudo systemctl status node_exporter
+curl http://localhost:9100/metrics
+
+# Verificar cAdvisor
+docker ps | grep cadvisor
+curl http://localhost:8080/metrics
+
+# Verificar Zabbix Agent (ainda não iniciado)
+sudo systemctl status zabbix-agent
+```
+
+### Configurar IP do Zabbix Server
+```bash
+# Obter IP privado da instância de monitoramento
+# Substituir ZABBIX_SERVER_IP pelo IP real
+sudo sed -i 's/ZABBIX_SERVER_IP/IP_PRIVADO_INSTANCIA_1/' /etc/zabbix/zabbix_agentd.conf
+
+# Iniciar Zabbix Agent
+sudo systemctl start zabbix-agent
+sudo systemctl status zabbix-agent
+```
+
+## Passo 8: Configurar integração no Grafana
 
 ### Atualizar configuração
 1. **Editar prometheus.yml** na instância do Prometheus Server

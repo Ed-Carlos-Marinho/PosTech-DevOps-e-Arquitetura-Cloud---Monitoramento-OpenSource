@@ -1,40 +1,50 @@
-# Aula 02 - PosTech DevOps e Arquitetura Cloud
+# Aula 03 - PosTech DevOps e Arquitetura Cloud
 
-Este repositório contém os materiais da **Aula 02** do módulo **Monitoramento OpenSource** da PosTech DevOps e Arquitetura Cloud.
+Este repositório contém os materiais da **Aula 03** do módulo **Monitoramento OpenSource** da PosTech DevOps e Arquitetura Cloud.
 
-## Conteúdo da Branch aula-02
+## Conteúdo da Branch aula-03
 
-### 1. Script de User Data EC2 (`ec2-userdata-demo.sh`)
-Script automatizado para configuração de instâncias EC2 Ubuntu com:
+### 1. Script de User Data EC2 Instância 1 (`ec2-userdata-instance-01.sh`)
+Script automatizado para configuração da instância de monitoramento com:
 - Docker e Docker Compose
-- Code-server (VS Code no navegador) na porta 80
+- Code-server (VS Code no navegador) na porta 8080
 - Configurações básicas de segurança
 
-### 2. Docker Compose Prometheus (`docker-compose.yml`)
-Stack do Prometheus para monitoramento moderno com:
+### 2. Script de User Data EC2 Instância 2 (`ec2-userdata-instance-02.sh`)
+Script automatizado para configuração da instância monitorada com:
+- Node Exporter (métricas do sistema)
+- cAdvisor (métricas de containers via Docker)
+- Zabbix Agent (monitoramento tradicional)
+- Configurações de firewall
+
+### 3. Docker Compose Stack Completa (`docker-compose.yml`)
+Stack integrada de monitoramento com:
+- Grafana (visualização de dados e dashboards)
 - Prometheus Server (coleta de métricas)
 - Alertmanager (gerenciamento de alertas)
+- Zabbix Server (monitoramento tradicional)
+- MySQL Database (para Zabbix)
 
-### 3. Exporters Manuais
-- Node Exporter (instalação manual nas instâncias)
-- cAdvisor (instalação manual nas instâncias)
+### 4. Exporters para Instância Monitorada
+- Node Exporter (instalação automática via user data)
+- cAdvisor (instalação automática via user data)
+- Zabbix Agent (instalação automática via user data)
 
 ## Arquivos de Documentação
 
-- `ec2-userdata.md` - Guia detalhado do script de user data
-- `prometheus-compose.md` - Guia detalhado do Docker Compose Prometheus
+- `ec2-userdata.md` - Guia detalhado dos scripts de user data
+- `grafana-compose.md` - Guia detalhado do Docker Compose com Grafana
 - `setup-ec2-instances.md` - Passo a passo completo para criar as instâncias EC2 com SSM
-- `exporters-installation.md` - Instalação manual do Node Exporter e cAdvisor
 
 ## Objetivo da Aula
 
-Aprender a configurar e utilizar o Prometheus para coleta de métricas em sistemas dinâmicos, entendendo conceitos de scraping, exporters e alert rules para monitoramento moderno.
+Configurar o Grafana para integrar fontes de dados (Prometheus, Zabbix, etc.), criar dashboards dinâmicos e configurar alertas visuais e notificações personalizadas.
 
 ## Teoria Abordada
 
-- **Monitoramento de sistemas dinâmicos e efêmeros**: Containers, microserviços e infraestrutura como código
-- **Modelo de coleta pull**: Como o Prometheus coleta métricas ativamente dos targets
-- **Exporters**: Componentes que expõem métricas de sistemas e aplicações
-- **Séries temporais**: Estrutura de dados para armazenamento de métricas ao longo do tempo
-- **Consultas com PromQL**: Linguagem de consulta do Prometheus para análise de dados
-- **Funcionamento do Alertmanager**: Gerenciamento e roteamento de alertas baseados em regras
+- **Arquitetura do Grafana**: Componentes, plugins e extensibilidade
+- **Conceitos de data sources**: Integração com Prometheus, Zabbix e outras fontes
+- **Variáveis e painéis dinâmicos**: Criação de dashboards interativos e reutilizáveis
+- **Alertas baseados em métricas**: Configuração de alertas visuais no Grafana
+- **Integração com Prometheus e Zabbix**: Unificação de ferramentas de monitoramento
+- **Boas práticas de visualização de dados**: Design de dashboards eficazes e informativos

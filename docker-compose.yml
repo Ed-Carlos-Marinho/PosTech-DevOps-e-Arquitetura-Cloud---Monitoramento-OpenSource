@@ -1,47 +1,287 @@
+# =============================================================================
+# DOCKER COMPOSE - GRAFANA MONITORING STACK
+# =============================================================================
+# Este arquivo configura uma stack completa de monitoramento com Grafana,
+# Prometheus, Alertmanager e Zabbix para a Aula 03 do curso PosTech DevOps
+# Foco: Visualização de dados e dashboards dinâmicos
+# =============================================================================
+
 version: '3.8'
 
 services:
+  # ---------------------------------------------------------------------------
+  # GRAFANA - Plataforma de visualização e dashboards
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    
+    # Porta de acesso à interface web do Grafana
+    ports:
+      - "3000:3000"
+    
+    # Variáveis de ambiente para configuração inicial
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123     # Senha do admin (ALTERAR EM PRODUÇÃO)
+      - GF_USERS_ALLOW_SIGN_UP=false            # Desabilita auto-registro
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+    
+    # Volumes para dados persistentes e configurações
+    volumes:
+      - grafana-data:/var/lib/grafana            # Dados persistentes do Grafana
+      - grafana-config:/etc/grafana              # Configurações personalizadas
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Aguarda outros serviços estarem prontos
+    depends_on:
+      - prometheus
+      - zabbix-server
+
+  # ---------------------------------------------------------------------------
+  # PROMETHEUS SERVER - Coleta e armazenamento de métricas
+  # ---------------------------------------------------------------------------
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    
+    # Porta de acesso à interface web do Prometheus
     ports:
       - "9090:9090"
+    
+    # Volumes para configuração e dados persistentes
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml
-      - prometheus-data:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml           # Configuração principal
+      - ./alert_rules.yml:/etc/prometheus/alert_rules.yml        # Regras de alerta
+      - prometheus-data:/prometheus                               # Dados persistentes
+    
+    # Parâmetros de inicialização do Prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
+      - '--config.file=/etc/prometheus/prometheus.yml'           # Arquivo de configuração
+      - '--storage.tsdb.path=/prometheus'                        # Caminho dos dados
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'
-      - '--web.enable-lifecycle'
-      - '--web.enable-admin-api'
+      - '--storage.tsdb.retention.time=200h'                     # Retenção de dados: 200 horas
+      - '--web.enable-lifecycle'                                 # Permite reload via API
+      - '--web.enable-admin-api'                                 # Habilita API administrativa
+    
     networks:
       - monitoring
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # ALERTMANAGER - Gerenciamento de alertas
+  # ---------------------------------------------------------------------------
   alertmanager:
     image: prom/alertmanager:latest
     container_name: alertmanager
+    
+    # Porta de acesso à interface web do Alertmanager
     ports:
       - "9093:9093"
+    
+    # Volumes para configuração e dados persistentes
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml
-      - alertmanager-data:/alertmanager
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml    # Configuração do Alertmanager
+      - alertmanager-data:/alertmanager                          # Dados persistentes
+    
+    # Parâmetros de inicialização do Alertmanager
     command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-      - '--web.external-url=http://localhost:9093'
+      - '--config.file=/etc/alertmanager/alertmanager.yml'       # Arquivo de configuração
+      - '--storage.path=/alertmanager'                           # Caminho dos dados
+      - '--web.external-url=http://localhost:9093'               # URL externa (ajustar conforme necessário)
+    
     networks:
       - monitoring
     restart: unless-stopped
 
-volumes:
-  prometheus-data:
-  alertmanager-data:
+  # ---------------------------------------------------------------------------
+  # MYSQL DATABASE - Banco de dados para o Zabbix
+  # ---------------------------------------------------------------------------
+  zabbix-db:
+    image: mysql:8.0
+    container_name: zabbix-mysql
+    
+    # Variáveis de ambiente para configuração do MySQL
+    environment:
+      MYSQL_DATABASE: zabbix                    # Nome do banco de dados do Zabbix
+      MYSQL_USER: zabbix                        # Usuário do banco para o Zabbix
+      MYSQL_PASSWORD: zabbix_password           # Senha do usuário zabbix (ALTERAR EM PRODUÇÃO)
+      MYSQL_ROOT_PASSWORD: root_password        # Senha do root MySQL (ALTERAR EM PRODUÇÃO)
+    
+    # Volume persistente para dados do MySQL
+    volumes:
+      - zabbix-db-data:/var/lib/mysql           # Dados persistentes do MySQL
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Configurações específicas do MySQL para Zabbix
+    command: --character-set-server=utf8 --collation-server=utf8_bin --default-authentication-plugin=mysql_native_password
+    
+    # Healthcheck para garantir que o MySQL está pronto antes de outros serviços
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      timeout: 20s                              # Timeout para cada teste
+      retries: 10                               # Número de tentativas
 
+  # ---------------------------------------------------------------------------
+  # ZABBIX SERVER - Engine de monitoramento tradicional
+  # ---------------------------------------------------------------------------
+  zabbix-server:
+    image: zabbix/zabbix-server-mysql:latest
+    container_name: zabbix-server
+    
+    # Configurações de conexão com banco e otimizações
+    environment:
+      # Configurações de banco de dados
+      DB_SERVER_HOST: zabbix-db                 # Host do banco (nome do container)
+      MYSQL_DATABASE: zabbix                    # Nome do banco
+      MYSQL_USER: zabbix                        # Usuário do banco
+      MYSQL_PASSWORD: zabbix_password           # Senha do banco
+      MYSQL_ROOT_PASSWORD: root_password        # Senha root do MySQL
+      
+      # Configurações de armazenamento e performance
+      ZBX_HISTORYSTORAGETYPES: log,text         # Tipos de dados históricos armazenados
+      ZBX_DEBUGLEVEL: 1                         # Nível de debug (0-4, 1=info básico)
+      ZBX_HOUSEKEEPINGFREQUENCY: 1              # Frequência de limpeza (horas)
+      ZBX_MAXHOUSEKEEPERDELETETIME: 5           # Tempo máximo para limpeza (minutos)
+      
+      # Configurações VMware (desabilitadas para economia de recursos)
+      ZBX_STARTVMWARECOLLECTORS: 0              # Número de coletores VMware (0=desabilitado)
+      ZBX_VMWAREFREQUENCY: 60                   # Frequência de coleta VMware (segundos)
+      ZBX_VMWAREPERFFREQUENCY: 60               # Frequência de performance VMware
+      ZBX_VMWARECACHESIZE: 8M                   # Tamanho do cache VMware
+      ZBX_VMWARETIMEOUT: 10                     # Timeout VMware (segundos)
+    
+    # Porta para comunicação com agentes Zabbix
+    ports:
+      - "10051:10051"                           # Porta padrão do Zabbix Server
+    
+    # Volume persistente para dados do Zabbix Server
+    volumes:
+      - zabbix-server-data:/var/lib/zabbix      # Dados e configurações do servidor
+    
+    networks:
+      - monitoring
+    
+    # Aguarda o banco estar saudável antes de iniciar
+    depends_on:
+      zabbix-db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # ZABBIX WEB INTERFACE - Interface web do Zabbix
+  # ---------------------------------------------------------------------------
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-mysql:latest
+    container_name: zabbix-web
+    
+    # Configurações de conexão e localização
+    environment:
+      ZBX_SERVER_HOST: zabbix-server            # Host do Zabbix Server
+      DB_SERVER_HOST: zabbix-db                 # Host do banco de dados
+      MYSQL_DATABASE: zabbix                    # Nome do banco
+      MYSQL_USER: zabbix                        # Usuário do banco
+      MYSQL_PASSWORD: zabbix_password           # Senha do banco
+      MYSQL_ROOT_PASSWORD: root_password        # Senha root do MySQL
+      PHP_TZ: America/Sao_Paulo                 # Timezone (ajustar conforme localização)
+    
+    # Porta de acesso à interface web
+    ports:
+      - "8080:8080"                             # Interface web do Zabbix
+    
+    networks:
+      - monitoring
+    
+    # Dependências: aguarda servidor e banco estarem prontos
+    depends_on:
+      zabbix-server:
+        condition: service_started
+      zabbix-db:
+        condition: service_healthy
+    restart: unless-stopped
+    
+    # Delay de 20 segundos para garantir que o Zabbix Server esteja completamente inicializado
+    command: >
+      sh -c "sleep 20 && 
+             /usr/bin/docker-entrypoint.sh"
+
+  # ---------------------------------------------------------------------------
+  # ZABBIX AGENT - Agente local para monitoramento do próprio servidor
+  # ---------------------------------------------------------------------------
+  zabbix-agent:
+    image: zabbix/zabbix-agent:latest
+    container_name: zabbix-agent
+    
+    # Configurações do agente
+    environment:
+      ZBX_HOSTNAME: "Grafana-Monitoring-Server"  # Nome do host no Zabbix
+      ZBX_SERVER_HOST: zabbix-server            # Host do Zabbix Server
+      ZBX_SERVER_PORT: 10051                    # Porta do Zabbix Server
+    
+    # Porta para comunicação com o Zabbix Server
+    ports:
+      - "10050:10050"                           # Porta padrão do Zabbix Agent
+    
+    networks:
+      - monitoring
+    
+    # Aguarda o Zabbix Server estar rodando
+    depends_on:
+      - zabbix-server
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------------
+# VOLUMES PERSISTENTES - Para manter dados entre reinicializações
+# -----------------------------------------------------------------------------
+volumes:
+  grafana-data:         # Dados do Grafana (dashboards, usuários, configurações)
+  grafana-config:       # Configurações personalizadas do Grafana
+  prometheus-data:      # Dados do Prometheus (métricas, índices)
+  alertmanager-data:    # Dados do Alertmanager (silenciamentos, estado)
+  zabbix-db-data:       # Dados do MySQL (banco de dados, configurações)
+  zabbix-server-data:   # Dados do Zabbix Server (configurações, cache)
+
+# -----------------------------------------------------------------------------
+# REDES - Rede interna para comunicação entre serviços
+# -----------------------------------------------------------------------------
 networks:
   monitoring:
     driver: bridge
+
+# =============================================================================
+# INSTRUÇÕES DE USO - AULA 03:
+# =============================================================================
+# 1. Para iniciar a stack completa:
+#    docker-compose up -d
+#
+# 2. Para acessar as interfaces:
+#    - Grafana: http://IP_SERVIDOR:3000 (admin/admin123)
+#    - Prometheus: http://IP_SERVIDOR:9090
+#    - Alertmanager: http://IP_SERVIDOR:9093
+#    - Zabbix: http://IP_SERVIDOR:8080 (Admin/zabbix)
+#
+# 3. Configurar Data Sources no Grafana:
+#    - Prometheus: http://prometheus:9090
+#    - Zabbix: http://zabbix-web:8080/api_jsonrpc.php
+#
+# 4. Para ver logs:
+#    docker-compose logs -f [nome_do_serviço]
+#
+# 5. Para parar a stack:
+#    docker-compose down
+# =============================================================================
+#
+# INTEGRAÇÃO GRAFANA + PROMETHEUS + ZABBIX:
+# =============================================================================
+# 1. Grafana como frontend unificado
+# 2. Prometheus para métricas modernas (containers, APIs)
+# 3. Zabbix para monitoramento tradicional (SNMP, agentes)
+# 4. Alertmanager para notificações centralizadas
+# 5. Dashboards combinando dados de múltiplas fontes
+# =============================================================================
