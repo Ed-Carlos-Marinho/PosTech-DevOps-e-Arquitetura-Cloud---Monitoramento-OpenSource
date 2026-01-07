@@ -1,98 +1,199 @@
+# =============================================================================
+# DOCKER COMPOSE - ZABBIX MONITORING STACK
+# =============================================================================
+# Este arquivo configura uma stack completa de monitoramento Zabbix
+# para a Aula 01 do curso PosTech DevOps e Arquitetura Cloud
+# =============================================================================
+
 version: '3.8'
 
 services:
+  # ---------------------------------------------------------------------------
+  # MYSQL DATABASE - Banco de dados para o Zabbix
+  # ---------------------------------------------------------------------------
   zabbix-db:
     image: mysql:8.0
     container_name: zabbix-mysql
+    
+    # Variáveis de ambiente para configuração do MySQL
     environment:
-      MYSQL_DATABASE: zabbix
-      MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix_password
-      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: zabbix                    # Nome do banco de dados do Zabbix
+      MYSQL_USER: zabbix                        # Usuário do banco para o Zabbix
+      MYSQL_PASSWORD: zabbix_password           # Senha do usuário zabbix (ALTERAR EM PRODUÇÃO)
+      MYSQL_ROOT_PASSWORD: root_password        # Senha do root MySQL (ALTERAR EM PRODUÇÃO)
+    
+    # Volume persistente para dados do MySQL
     volumes:
-      - zabbix-db-data:/var/lib/mysql
+      - zabbix-db-data:/var/lib/mysql           # Dados persistentes do MySQL
+    
     networks:
       - zabbix-net
     restart: unless-stopped
+    
+    # Configurações específicas do MySQL para Zabbix
     command: --character-set-server=utf8 --collation-server=utf8_bin --default-authentication-plugin=mysql_native_password
+    
+    # Healthcheck para garantir que o MySQL está pronto antes de outros serviços
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$$MYSQL_ROOT_PASSWORD"]
-      timeout: 20s
-      retries: 10
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p$MYSQL_ROOT_PASSWORD"]
+      timeout: 20s                              # Timeout para cada teste
+      retries: 10                               # Número de tentativas
 
+  # ---------------------------------------------------------------------------
+  # ZABBIX SERVER - Engine principal de monitoramento
+  # ---------------------------------------------------------------------------
   zabbix-server:
     image: zabbix/zabbix-server-mysql:latest
     container_name: zabbix-server
+    
+    # Configurações de conexão com banco e otimizações
     environment:
-      DB_SERVER_HOST: zabbix-db
-      MYSQL_DATABASE: zabbix
-      MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix_password
-      MYSQL_ROOT_PASSWORD: root_password
-      ZBX_HISTORYSTORAGETYPES: log,text
-      ZBX_DEBUGLEVEL: 1
-      ZBX_HOUSEKEEPINGFREQUENCY: 1
-      ZBX_MAXHOUSEKEEPERDELETETIME: 5
-      ZBX_STARTVMWARECOLLECTORS: 0
-      ZBX_VMWAREFREQUENCY: 60
-      ZBX_VMWAREPERFFREQUENCY: 60
-      ZBX_VMWARECACHESIZE: 8M
-      ZBX_VMWARETIMEOUT: 10
+      # Configurações de banco de dados
+      DB_SERVER_HOST: zabbix-db                 # Host do banco (nome do container)
+      MYSQL_DATABASE: zabbix                    # Nome do banco
+      MYSQL_USER: zabbix                        # Usuário do banco
+      MYSQL_PASSWORD: zabbix_password           # Senha do banco
+      MYSQL_ROOT_PASSWORD: root_password        # Senha root do MySQL
+      
+      # Configurações de armazenamento e performance
+      ZBX_HISTORYSTORAGETYPES: log,text         # Tipos de dados históricos armazenados
+      ZBX_DEBUGLEVEL: 1                         # Nível de debug (0-4, 1=info básico)
+      ZBX_HOUSEKEEPINGFREQUENCY: 1              # Frequência de limpeza (horas)
+      ZBX_MAXHOUSEKEEPERDELETETIME: 5           # Tempo máximo para limpeza (minutos)
+      
+      # Configurações VMware (desabilitadas para economia de recursos)
+      ZBX_STARTVMWARECOLLECTORS: 0              # Número de coletores VMware (0=desabilitado)
+      ZBX_VMWAREFREQUENCY: 60                   # Frequência de coleta VMware (segundos)
+      ZBX_VMWAREPERFFREQUENCY: 60               # Frequência de performance VMware
+      ZBX_VMWARECACHESIZE: 8M                   # Tamanho do cache VMware
+      ZBX_VMWARETIMEOUT: 10                     # Timeout VMware (segundos)
+    
+    # Porta para comunicação com agentes Zabbix
     ports:
-      - "10051:10051"
+      - "10051:10051"                           # Porta padrão do Zabbix Server
+    
+    # Volume persistente para dados do Zabbix Server
     volumes:
-      - zabbix-server-data:/var/lib/zabbix
+      - zabbix-server-data:/var/lib/zabbix      # Dados e configurações do servidor
+    
     networks:
       - zabbix-net
+    
+    # Aguarda o banco estar saudável antes de iniciar
     depends_on:
       zabbix-db:
         condition: service_healthy
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # ZABBIX WEB INTERFACE - Interface web do Zabbix
+  # ---------------------------------------------------------------------------
   zabbix-web:
     image: zabbix/zabbix-web-nginx-mysql:latest
     container_name: zabbix-web
+    
+    # Configurações de conexão e localização
     environment:
-      ZBX_SERVER_HOST: zabbix-server
-      DB_SERVER_HOST: zabbix-db
-      MYSQL_DATABASE: zabbix
-      MYSQL_USER: zabbix
-      MYSQL_PASSWORD: zabbix_password
-      MYSQL_ROOT_PASSWORD: root_password
-      PHP_TZ: America/Sao_Paulo
+      ZBX_SERVER_HOST: zabbix-server            # Host do Zabbix Server
+      DB_SERVER_HOST: zabbix-db                 # Host do banco de dados
+      MYSQL_DATABASE: zabbix                    # Nome do banco
+      MYSQL_USER: zabbix                        # Usuário do banco
+      MYSQL_PASSWORD: zabbix_password           # Senha do banco
+      MYSQL_ROOT_PASSWORD: root_password        # Senha root do MySQL
+      PHP_TZ: America/Sao_Paulo                 # Timezone (ajustar conforme localização)
+    
+    # Porta de acesso à interface web
     ports:
-      - "80:8080"
+      - "80:8080"                               # Mapeia porta 80 do host para 8080 do container
+    
     networks:
       - zabbix-net
+    
+    # Dependências: aguarda servidor e banco estarem prontos
     depends_on:
       zabbix-server:
         condition: service_started
       zabbix-db:
         condition: service_healthy
     restart: unless-stopped
+    
+    # Delay de 20 segundos para garantir que o Zabbix Server esteja completamente inicializado
     command: >
       sh -c "sleep 20 && 
              /usr/bin/docker-entrypoint.sh"
 
+  # ---------------------------------------------------------------------------
+  # ZABBIX AGENT - Agente local para monitoramento do próprio servidor
+  # ---------------------------------------------------------------------------
   zabbix-agent:
     image: zabbix/zabbix-agent:latest
     container_name: zabbix-agent
+    
+    # Configurações do agente
     environment:
-      ZBX_HOSTNAME: "Zabbix server"
-      ZBX_SERVER_HOST: zabbix-server
-      ZBX_SERVER_PORT: 10051
+      ZBX_HOSTNAME: "Zabbix server"             # Nome do host no Zabbix (deve coincidir com configuração)
+      ZBX_SERVER_HOST: zabbix-server            # Host do Zabbix Server
+      ZBX_SERVER_PORT: 10051                    # Porta do Zabbix Server
+    
+    # Porta para comunicação com o Zabbix Server
     ports:
-      - "10050:10050"
+      - "10050:10050"                           # Porta padrão do Zabbix Agent
+    
     networks:
       - zabbix-net
+    
+    # Aguarda o Zabbix Server estar rodando
     depends_on:
       - zabbix-server
     restart: unless-stopped
 
+# -----------------------------------------------------------------------------
+# VOLUMES PERSISTENTES - Para manter dados entre reinicializações
+# -----------------------------------------------------------------------------
 volumes:
-  zabbix-db-data:
-  zabbix-server-data:
+  zabbix-db-data:       # Dados do MySQL (banco de dados, configurações)
+  zabbix-server-data:   # Dados do Zabbix Server (configurações, cache)
 
+# -----------------------------------------------------------------------------
+# REDES - Rede interna para comunicação entre serviços
+# -----------------------------------------------------------------------------
 networks:
   zabbix-net:
-    driver: bridge
+    driver: bridge      # Rede bridge para comunicação interna
+
+# =============================================================================
+# INSTRUÇÕES DE USO:
+# =============================================================================
+# 1. Para iniciar a stack:
+#    docker-compose up -d
+#
+# 2. Para acessar a interface web:
+#    http://SEU_IP (porta 80)
+#    Usuário: Admin
+#    Senha: zabbix
+#
+# 3. Para ver logs:
+#    docker-compose logs -f [nome_do_serviço]
+#
+# 4. Para parar a stack:
+#    docker-compose down
+#
+# 5. Para parar e remover dados (CUIDADO):
+#    docker-compose down -v
+#
+# =============================================================================
+# SEGURANÇA - IMPORTANTE PARA PRODUÇÃO:
+# =============================================================================
+# 1. Altere as senhas padrão:
+#    - MYSQL_PASSWORD
+#    - MYSQL_ROOT_PASSWORD
+#
+# 2. Configure firewall adequadamente:
+#    - Porta 80: Interface web (restringir IPs se necessário)
+#    - Porta 10051: Zabbix Server (apenas para agentes)
+#    - Porta 10050: Zabbix Agent (apenas para servidor)
+#
+# 3. Configure SSL/TLS para interface web em produção
+#
+# 4. Implemente backup regular dos volumes de dados
+# =============================================================================
