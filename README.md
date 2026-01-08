@@ -69,6 +69,51 @@ Cada aula possui sua própria branch com materiais específicos e documentação
 
 **Tecnologias:** Grafana, Prometheus, Zabbix, Dashboards, Alerting
 
+---
+
+#### [Aula 04 - Logs com Loki](../../tree/aula-04)
+**Objetivo:** Configurar o Loki para coleta, armazenamento e consulta de logs, integrando com Grafana para correlação entre logs e métricas em uma solução de observabilidade unificada.
+
+**Teoria Abordada:**
+- Conceitos de log aggregation e centralização
+- Arquitetura Loki vs Elasticsearch
+- Promtail como agente de coleta
+- LogQL para consultas de logs
+- Correlação entre logs e métricas
+- Estratégias de retenção e performance
+
+**Conteúdo:**
+- Stack Loki + Grafana + Prometheus
+- Configuração do Promtail para coleta
+- Aplicação de teste geradora de logs
+- Consultas LogQL práticas
+- Correlação logs-métricas no Grafana
+
+**Tecnologias:** Loki, Promtail, LogQL, Grafana, Log Aggregation
+
+---
+
+#### [Aula 05 - Tracing com Jaeger](../../tree/aula-05)
+**Objetivo:** Entender o conceito de tracing distribuído e configurar o Jaeger para rastrear requisições entre serviços, identificar gargalos e melhorar a performance de aplicações distribuídas.
+
+**Teoria Abordada:**
+- Conceitos de tracing distribuído
+- Spans, traces e contexto de requisição
+- Sampling e instrumentação de serviços
+- Arquitetura Jaeger (collector, agent, query e UI)
+- Diagnóstico de latência e gargalos
+- Jaeger Client Libraries nativo
+- Context propagation entre serviços
+
+**Conteúdo:**
+- Stack Jaeger completa (collector, agent, query, UI)
+- Aplicações distribuídas instrumentadas (Node.js + Python)
+- Instrumentação com Jaeger Client Libraries
+- Correlação traces-logs-métricas
+- Análise de performance e debugging
+
+**Tecnologias:** Jaeger, OpenTracing, Distributed Tracing, Node.js, Python Flask
+
 ## 🚀 Como Usar
 
 ### 1. Escolher a Aula
@@ -77,6 +122,8 @@ Navegue para a branch correspondente à aula desejada:
 git checkout aula-01  # Para Zabbix
 git checkout aula-02  # Para Prometheus  
 git checkout aula-03  # Para Grafana
+git checkout aula-04  # Para Logs com Loki
+git checkout aula-05  # Para Tracing com Jaeger
 ```
 
 ### 2. Seguir a Documentação
@@ -135,6 +182,33 @@ Cada branch contém:
 └─────────────────┘    └─────────────────┘
 ```
 
+### Aula 04 (Logs com Loki)
+```
+┌─────────────────┐    ┌─────────────────┐
+│   Instância 1   │    │   Instância 2   │
+│                 │    │                 │
+│ • Grafana       │◄──►│ • Test App      │
+│ • Loki          │    │ • Promtail      │
+│ • Prometheus    │    │ • Nginx Proxy   │
+│ • Promtail      │    │                 │
+└─────────────────┘    └─────────────────┘
+```
+
+### Aula 05 (Tracing com Jaeger)
+```
+┌─────────────────┐    ┌─────────────────┐
+│   Instância 1   │    │   Instância 2   │
+│                 │    │                 │
+│ • Grafana       │◄──►│ • Frontend App  │
+│ • Jaeger UI     │    │ • Backend API   │
+│ • Jaeger Query  │    │ • PostgreSQL    │
+│ • Jaeger Coll.  │    │ • Redis Cache   │
+│ • Elasticsearch │    │ • RabbitMQ      │
+│ • Loki          │    │ • Jaeger Agent  │
+│ • Prometheus    │    │ • Promtail      │
+└─────────────────┘    └─────────────────┘
+```
+
 ## 🎯 Objetivos de Aprendizado
 
 Ao completar este módulo, você será capaz de:
@@ -142,8 +216,10 @@ Ao completar este módulo, você será capaz de:
 - **Implementar** soluções de monitoramento tradicionais com Zabbix
 - **Configurar** monitoramento moderno com Prometheus e PromQL
 - **Criar** dashboards dinâmicos e alertas visuais com Grafana
+- **Centralizar** logs com Loki e consultas LogQL
+- **Implementar** tracing distribuído com Jaeger
 - **Integrar** múltiplas ferramentas de monitoramento
-- **Aplicar** boas práticas de observabilidade em infraestrutura
+- **Aplicar** boas práticas de observabilidade completa (métricas, logs, traces)
 - **Automatizar** deployment de stacks de monitoramento
 
 ## 📖 Recursos Adicionais
@@ -151,7 +227,11 @@ Ao completar este módulo, você será capaz de:
 - [Documentação oficial do Zabbix](https://www.zabbix.com/documentation)
 - [Documentação oficial do Prometheus](https://prometheus.io/docs/)
 - [Documentação oficial do Grafana](https://grafana.com/docs/)
+- [Documentação oficial do Loki](https://grafana.com/docs/loki/latest/)
+- [Documentação oficial do Jaeger](https://www.jaegertracing.io/docs/)
 - [PromQL Tutorial](https://prometheus.io/docs/prometheus/latest/querying/basics/)
+- [LogQL Tutorial](https://grafana.com/docs/loki/latest/logql/)
+- [OpenTracing Specification](https://opentracing.io/specification/)
 - [Grafana Dashboard Gallery](https://grafana.com/grafana/dashboards/)
 
 ## 🤝 Contribuição
