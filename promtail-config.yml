@@ -2,8 +2,8 @@
 # PROMTAIL CONFIGURATION - OBSERVABILITY INSTANCE
 # =============================================================================
 # Configuração do Promtail para coleta de logs da instância de observabilidade
-# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
-# Foco: Coleta de logs dos próprios serviços de observabilidade
+# Aula 05 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Foco: Coleta de logs dos serviços de observabilidade (Grafana, Loki, Prometheus, Jaeger)
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -128,25 +128,132 @@ scrape_configs:
       - labels:
           container_id: container_id        # Adiciona ID do container como label
 
+  # ---------------------------------------------------------------------------
+  # JOB 3: LOGS DO JAEGER (COLLECTOR, QUERY)
+  # ---------------------------------------------------------------------------
+  - job_name: jaeger-logs
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: jaeger-logs
+          host: observability-server
+          service: jaeger
+          __path__: /var/lib/docker/containers/*/jaeger-*-*.log
+    
+    # Pipeline para logs do Jaeger via Docker
+    pipeline_stages:
+      
+      # Parsing do formato JSON dos logs do Docker
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+      
+      # Adicionar stream como label
+      - labels:
+          stream: stream
+      
+      # Parsing de timestamp do Docker
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      
+      # Usar o campo 'output' como conteúdo da linha
+      - output:
+          source: output
+      
+      # Extrair componente do Jaeger do nome do container
+      - regex:
+          expression: '/var/lib/docker/containers/[^/]+/jaeger-(?P<jaeger_component>[^-]+)-.*'
+          source: __path__
+      
+      # Adicionar componente como label
+      - labels:
+          jaeger_component: jaeger_component
+
+  # ---------------------------------------------------------------------------
+  # JOB 4: LOGS DO ELASTICSEARCH
+  # ---------------------------------------------------------------------------
+  - job_name: elasticsearch-logs
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: elasticsearch-logs
+          host: observability-server
+          service: elasticsearch
+          __path__: /var/lib/docker/containers/*/elasticsearch-*.log
+    
+    # Pipeline para logs do Elasticsearch via Docker
+    pipeline_stages:
+      
+      # Parsing do formato JSON dos logs do Docker
+      - json:
+          expressions:
+            output: log
+            stream: stream
+            time: time
+      
+      # Adicionar stream como label
+      - labels:
+          stream: stream
+      
+      # Parsing de timestamp do Docker
+      - timestamp:
+          source: time
+          format: RFC3339Nano
+      
+      # Usar o campo 'output' como conteúdo da linha
+      - output:
+          source: output
+
 # =============================================================================
 # INTEGRAÇÃO COM LOKI - INSTÂNCIA 1:
 # =============================================================================
 # 1. Este Promtail coleta logs da própria instância de observabilidade
-# 2. Foco em logs dos serviços Grafana, Loki, Prometheus
-# 3. Labels organizados por job, service, stream
-# 4. Correlação com métricas do Prometheus
+# 2. Foco em logs dos serviços Grafana, Loki, Prometheus, Jaeger, Elasticsearch
+# 3. Labels organizados por job, service, stream, jaeger_component
+# 4. Correlação com métricas do Prometheus e traces do Jaeger
 #
 # CONSULTAS LOGQL RESULTANTES:
 # - {job="syslog"}: Logs do sistema
 # - {job="docker-observability"}: Logs dos containers de observabilidade
+# - {job="jaeger-logs"}: Logs dos componentes do Jaeger
+# - {job="elasticsearch-logs"}: Logs do Elasticsearch
 # - {service="grafana"}: Logs específicos do Grafana
 # - {service="loki"}: Logs específicos do Loki
 # - {service="prometheus"}: Logs específicos do Prometheus
+# - {jaeger_component="collector"}: Logs do Jaeger Collector
+# - {jaeger_component="query"}: Logs do Jaeger Query
 # =============================================================================
 #
-# CORRELAÇÃO COM MÉTRICAS:
+# CORRELAÇÃO COM MÉTRICAS E TRACES:
 # =============================================================================
 # Use estas consultas em dashboards Grafana para correlacionar:
+#
+# 1. Volume de logs vs métricas:
+#    - LogQL: rate({job="docker-observability"}[5m])
+#    - PromQL: rate(promtail_sent_entries_total[5m])
+#
+# 2. Erros nos serviços vs traces:
+#    - LogQL: {job="docker-observability"} |= "error"
+#    - PromQL: up{job="loki"}
+#    - Jaeger: Traces com status error
+#
+# 3. Performance do Jaeger:
+#    - LogQL: {job="jaeger-logs"} |= "slow"
+#    - PromQL: jaeger_collector_spans_received_total
+#    - Elasticsearch: Logs de indexação
+#
+# 4. Correlação completa (Logs + Métricas + Traces):
+#    - LogQL: {job="jaeger-logs"} | json | trace_id!=""
+#    - PromQL: jaeger_query_requests_total
+#    - Jaeger UI: Traces específicos por trace_id
+# =============================================================================
 #
 # 1. Volume de logs vs métricas:
 #    - LogQL: rate({job="docker-observability"}[5m])

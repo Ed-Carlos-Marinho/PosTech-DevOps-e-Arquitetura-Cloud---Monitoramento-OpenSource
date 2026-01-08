@@ -1,16 +1,16 @@
 # =============================================================================
-# DOCKER COMPOSE - LOKI OBSERVABILITY STACK
+# DOCKER COMPOSE - COMPLETE OBSERVABILITY STACK
 # =============================================================================
-# Este arquivo configura uma stack de observabilidade com Grafana,
-# Prometheus, Loki e Promtail para a Aula 04 do curso PosTech DevOps
-# Foco: Logs centralizados com Loki e correlação básica com métricas
+# Este arquivo configura uma stack completa de observabilidade com Grafana,
+# Prometheus, Loki, Promtail e Jaeger para a Aula 05 do curso PosTech DevOps
+# Foco: Observabilidade completa com métricas, logs e traces distribuídos
 # =============================================================================
 
 version: '3.8'
 
 services:
   # ---------------------------------------------------------------------------
-  # GRAFANA - Plataforma de visualização unificada (logs + métricas)
+  # GRAFANA - Plataforma de visualização unificada (logs + métricas + traces)
   # ---------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:latest
@@ -25,7 +25,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin123     # Senha do admin (ALTERAR EM PRODUÇÃO)
       - GF_USERS_ALLOW_SIGN_UP=false            # Desabilita auto-registro
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
-      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor # Habilita editor TraceQL para futuras integrações
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor,correlations # Habilita editor TraceQL e correlações
     
     # Volumes para dados persistentes e configurações
     volumes:
@@ -40,6 +40,7 @@ services:
     depends_on:
       - prometheus
       - loki
+      - jaeger-query
 
   # ---------------------------------------------------------------------------
   # PROMETHEUS SERVER - Coleta e armazenamento de métricas
@@ -127,6 +128,92 @@ services:
       loki:
         condition: service_healthy
 
+  # ---------------------------------------------------------------------------
+  # JAEGER COLLECTOR - Recebe traces dos agentes e aplicações
+  # ---------------------------------------------------------------------------
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector:latest
+    container_name: jaeger-collector
+    
+    # Portas para recebimento de traces
+    ports:
+      - "14268:14268"     # HTTP endpoint para spans
+      - "14250:14250"     # gRPC endpoint para spans
+      - "9411:9411"       # Zipkin compatible endpoint
+    
+    # Variáveis de ambiente para configuração
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=http://elasticsearch:9200
+      - ES_TAGS_AS_FIELDS_ALL=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Aguarda Elasticsearch estar pronto
+    depends_on:
+      - elasticsearch
+
+  # ---------------------------------------------------------------------------
+  # JAEGER QUERY - Interface de consulta e API
+  # ---------------------------------------------------------------------------
+  jaeger-query:
+    image: jaegertracing/jaeger-query:latest
+    container_name: jaeger-query
+    
+    # Porta da interface web do Jaeger
+    ports:
+      - "16686:16686"     # Interface web do Jaeger UI
+      - "16687:16687"     # gRPC endpoint
+    
+    # Variáveis de ambiente para configuração
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=http://elasticsearch:9200
+      - ES_TAGS_AS_FIELDS_ALL=true
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Aguarda Elasticsearch estar pronto
+    depends_on:
+      - elasticsearch
+
+  # ---------------------------------------------------------------------------
+  # ELASTICSEARCH - Armazenamento de traces do Jaeger
+  # ---------------------------------------------------------------------------
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.0
+    container_name: elasticsearch
+    
+    # Porta do Elasticsearch
+    ports:
+      - "9200:9200"
+    
+    # Variáveis de ambiente para configuração
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+      - xpack.security.enabled=false
+    
+    # Volumes para dados persistentes
+    volumes:
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Healthcheck para garantir que Elasticsearch está pronto
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
 # -----------------------------------------------------------------------------
 # VOLUMES PERSISTENTES - Para manter dados entre reinicializações
 # -----------------------------------------------------------------------------
@@ -136,6 +223,7 @@ volumes:
   prometheus-data:      # Dados do Prometheus (métricas, índices)
   loki-data:            # Dados do Loki (logs, índices, chunks)
   promtail-positions:   # Posições de leitura dos arquivos de log pelo Promtail
+  elasticsearch-data:   # Dados do Elasticsearch (traces do Jaeger)
 
 # -----------------------------------------------------------------------------
 # REDES - Rede interna para comunicação entre serviços
@@ -145,34 +233,38 @@ networks:
     driver: bridge
 
 # =============================================================================
-# INSTRUÇÕES DE USO - AULA 04:
+# INSTRUÇÕES DE USO - AULA 05:
 # =============================================================================
 # 1. Para iniciar a stack completa:
-#    docker-compose up -d
+#    docker-compose -f docker-compose-observability.yml up -d
 #
 # 2. Para acessar as interfaces:
 #    - Grafana: http://IP_SERVIDOR:3000 (admin/admin123)
 #    - Prometheus: http://IP_SERVIDOR:9090
 #    - Loki: http://IP_SERVIDOR:3100 (API - não tem interface web)
+#    - Jaeger UI: http://IP_SERVIDOR:16686
+#    - Elasticsearch: http://IP_SERVIDOR:9200
 #
 # 3. Configurar Data Sources no Grafana:
 #    - Prometheus: http://prometheus:9090
 #    - Loki: http://loki:3100
+#    - Jaeger: http://jaeger-query:16686
 #
 # 4. Para ver logs:
-#    docker-compose logs -f [nome_do_serviço]
+#    docker-compose -f docker-compose-observability.yml logs -f [nome_do_serviço]
 #
 # 5. Para parar a stack:
-#    docker-compose down
+#    docker-compose -f docker-compose-observability.yml down
 # =============================================================================
 #
-# INTEGRAÇÃO GRAFANA + PROMETHEUS + LOKI:
+# INTEGRAÇÃO GRAFANA + PROMETHEUS + LOKI + JAEGER:
 # =============================================================================
-# 1. Grafana como frontend unificado para logs e métricas
-# 2. Prometheus para métricas básicas (próprio Prometheus e Promtail)
-# 3. Loki para logs centralizados (sistema, aplicações, containers)
-# 4. Promtail para coleta automática de logs da instância 2
-# 5. Dashboards combinando logs e métricas básicas
-# 6. Correlação temporal entre eventos de logs e métricas
-# 7. Foco educacional: aprender LogQL e correlação logs + métricas
+# 1. Grafana como frontend unificado para métricas, logs e traces
+# 2. Prometheus para métricas de aplicações e infraestrutura
+# 3. Loki para logs centralizados com correlação por trace_id
+# 4. Jaeger para tracing distribuído completo
+# 5. Elasticsearch como backend de armazenamento para traces
+# 6. Dashboards combinando os três pilares da observabilidade
+# 7. Correlação temporal entre traces, logs e métricas
+# 8. Foco educacional: observabilidade completa em microserviços
 # =============================================================================

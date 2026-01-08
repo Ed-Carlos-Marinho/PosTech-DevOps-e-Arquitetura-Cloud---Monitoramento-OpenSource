@@ -1,22 +1,45 @@
-# Loki Docker Compose
+# Complete Observability Stack - Docker Compose
 
-Stack de observabilidade com Loki, Promtail, Grafana e Prometheus usando Docker Compose, parte da Aula 04 do módulo Monitoramento OpenSource.
+Stack completa de observabilidade com Grafana, Prometheus, Loki, Promtail e Jaeger usando Docker Compose, parte da Aula 05 do módulo Monitoramento OpenSource.
 
 ## Componentes da Stack
 
-### Serviços de Logs
-- **loki**: Sistema de agregação de logs (porta 3100)
-- **promtail**: Agente de coleta de logs (porta 9080)
+### Serviços de Visualização
+- **grafana**: Plataforma de visualização unificada (porta 3000)
+  - Dashboards para métricas, logs e traces
+  - Correlação entre os três pilares da observabilidade
 
 ### Serviços de Métricas
-- **grafana**: Plataforma de visualização unificada (porta 3000)
-- **prometheus**: Coleta de métricas básicas (porta 9090)
+- **prometheus**: Coleta e armazenamento de métricas (porta 9090)
+  - Métricas dos serviços de observabilidade
+  - Métricas do Jaeger e Elasticsearch
+
+### Serviços de Logs
+- **loki**: Sistema de agregação de logs (porta 3100)
+  - Armazenamento centralizado de logs
+  - Correlação com traces via trace_id
+- **promtail**: Agente de coleta de logs (porta 9080)
+  - Coleta logs do sistema e containers
+  - Parsing e labeling automático
+
+### Serviços de Tracing
+- **jaeger-collector**: Recebe traces dos agentes (portas 14268, 14250, 9411)
+  - Processamento e validação de spans
+  - Armazenamento no Elasticsearch
+- **jaeger-query**: Interface de consulta e API (porta 16686)
+  - Jaeger UI para visualização de traces
+  - API para integração com Grafana
+- **elasticsearch**: Armazenamento de traces (porta 9200)
+  - Backend de armazenamento para o Jaeger
+  - Indexação e busca de traces
 
 ### Volumes Persistentes
+- **grafana-data**: Dashboards, usuários e configurações do Grafana
+- **grafana-config**: Configurações personalizadas do Grafana
+- **prometheus-data**: Métricas e índices do Prometheus
 - **loki-data**: Logs, índices e chunks do Loki
 - **promtail-positions**: Posições de leitura dos arquivos de log
-- **grafana-data**: Dashboards, usuários e configurações do Grafana
-- **prometheus-data**: Métricas e índices do Prometheus
+- **elasticsearch-data**: Traces e índices do Elasticsearch
 
 ## Como usar
 

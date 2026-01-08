@@ -1,36 +1,34 @@
 # =============================================================================
-# DOCKERFILE - TEST APPLICATION
+# DOCKERFILE - BACKEND SERVICE
 # =============================================================================
-# Dockerfile para aplicação de teste que gera logs abundantes
-# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Backend service com Python Flask e instrumentação OpenTelemetry
+# Aula 05 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
 # =============================================================================
 
-FROM python:3.11-slim
+FROM python:3.9-slim
 
 # Definir diretório de trabalho
 WORKDIR /app
 
 # Instalar dependências do sistema
 RUN apt-get update && apt-get install -y \
-    curl \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copiar requirements e instalar dependências Python
+# Copiar arquivo de dependências
 COPY requirements.txt .
+
+# Instalar dependências Python
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copiar código da aplicação
-COPY test-app.py .
+COPY . .
 
-# Criar diretório para logs
+# Criar diretório de logs
 RUN mkdir -p /app/logs
 
 # Expor porta da aplicação
 EXPOSE 5000
 
-# Definir usuário não-root para segurança
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
-USER appuser
-
-# Comando para iniciar a aplicação
-CMD ["python", "test-app.py"]
+# Comando para iniciar a aplicação com instrumentação
+CMD ["python", "app.py"]

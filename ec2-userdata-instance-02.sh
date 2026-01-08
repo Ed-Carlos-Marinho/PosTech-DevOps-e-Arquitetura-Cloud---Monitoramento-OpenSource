@@ -1,15 +1,15 @@
 #!/bin/bash
 
 # =============================================================================
-# EC2 USER DATA SCRIPT - TEST APPLICATION SETUP
+# EC2 USER DATA SCRIPT - DISTRIBUTED APPLICATIONS SETUP
 # =============================================================================
-# Script de configuração automática para instância de aplicação de teste (Instância 2)
-# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Script de configuração automática para instância de aplicações distribuídas (Instância 2)
+# Aula 05 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
 # 
 # Este script instala e configura automaticamente:
 # - Docker e Docker Compose
-# - Clona repositório com aplicação de teste
-# - Inicia stack de aplicação via Docker Compose
+# - Clona repositório com aplicações distribuídas instrumentadas
+# - Inicia stack de aplicações via Docker Compose
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -25,7 +25,7 @@ export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 # Redireciona toda saída (stdout e stderr) para arquivo de log
 # Permite acompanhar a execução via: sudo tail -f /var/log/user-data.log
 exec > >(tee /var/log/user-data.log) 2>&1
-echo "=== Iniciando configuração da aplicação de teste em $(date) ==="
+echo "=== Iniciando configuração das aplicações distribuídas em $(date) ==="
 
 # -----------------------------------------------------------------------------
 # FUNÇÃO DE VERIFICAÇÃO DE STATUS
@@ -87,8 +87,8 @@ check_status "Instalação do Docker Compose"
 
 echo "📥 Clonando repositório..."
 cd /home/ubuntu
-git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git repo
-cd repo/test-app
+git clone -b aula-05 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git repo
+cd repo/distributed-app
 chown -R ubuntu:ubuntu /home/ubuntu/repo
 check_status "Clonagem do repositório"
 
@@ -96,10 +96,10 @@ check_status "Clonagem do repositório"
 # FASE 6: CONFIGURAÇÃO E INICIALIZAÇÃO DA STACK
 # =============================================================================
 
-echo "🚀 Iniciando stack de aplicação..."
+echo "🚀 Iniciando stack de aplicações distribuídas..."
 # Iniciar stack usando docker-compose
 sudo -u ubuntu docker-compose -f docker-compose-app.yml up -d
-check_status "Inicialização da stack de aplicação"
+check_status "Inicialização da stack de aplicações distribuídas"
 
 # =============================================================================
 # FASE 7: CONFIGURAÇÃO DO FIREWALL
@@ -108,8 +108,10 @@ check_status "Inicialização da stack de aplicação"
 echo "🔥 Configurando firewall..."
 ufw --force enable                          # Habilita firewall (força sem prompt)
 ufw allow ssh                               # Permite SSH (porta 22)
-ufw allow http                              # Permite HTTP (porta 80) - para aplicação via Nginx
+ufw allow http                              # Permite HTTP (porta 80) - para frontend
+ufw allow 5000                              # Permite Backend API
 ufw allow 9080                              # Permite Promtail (métricas)
+ufw allow 15672                             # Permite RabbitMQ Management UI
 check_status "Configuração do firewall"
 
 # =============================================================================
@@ -119,33 +121,37 @@ check_status "Configuração do firewall"
 echo "🔍 Verificando status dos serviços..."
 # Verifica se serviços estão ativos e reporta status
 systemctl is-active docker && echo "✅ Docker está rodando"
-sudo -u ubuntu docker-compose -f /home/ubuntu/repo/test-app/docker-compose-app.yml ps
+sudo -u ubuntu docker-compose -f /home/ubuntu/repo/distributed-app/docker-compose-app.yml ps
 
 # =============================================================================
 # FINALIZAÇÃO E INFORMAÇÕES DE ACESSO
 # =============================================================================
 
-echo "=== ✅ Configuração da aplicação de teste concluída em $(date) ==="
+echo "=== ✅ Configuração das aplicações distribuídas concluída em $(date) ==="
 echo ""
 echo "🚀 Serviços instalados e configurados:"
-echo "   - Aplicação de teste: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
-echo "   - Nginx (proxy): http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+echo "   - Frontend: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
+echo "   - Backend API: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5000"
+echo "   - RabbitMQ Management: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):15672 (guest/guest)"
 echo "   - Promtail: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9080/metrics"
 echo ""
 echo "⚠️  PRÓXIMOS PASSOS MANUAIS:"
 echo "   1. Obter IP privado da instância de observabilidade (Instância 1)"
-echo "   2. Editar: /home/ubuntu/repo/test-app/promtail-app-config.yml"
-echo "   3. Substituir LOKI_SERVER_IP pelo IP real"
-echo "   4. Executar: cd /home/ubuntu/repo/test-app && docker-compose -f docker-compose-app.yml restart promtail"
-echo "   5. Testar aplicação: curl http://localhost/"
-echo "   6. Gerar logs: curl http://localhost/generate/100"
-echo "   7. Verificar logs no Grafana via Loki"
+echo "   2. Editar: /home/ubuntu/repo/distributed-app/docker-compose-app.yml"
+echo "   3. Substituir JAEGER_COLLECTOR_IP pelo IP real da Instância 1"
+echo "   4. Editar: /home/ubuntu/repo/distributed-app/promtail-app-config.yml"
+echo "   5. Substituir LOKI_SERVER_IP pelo IP real da Instância 1"
+echo "   6. Executar: cd /home/ubuntu/repo/distributed-app && docker-compose -f docker-compose-app.yml restart jaeger-agent promtail"
+echo "   7. Testar aplicações: curl http://localhost/api/users"
+echo "   8. Verificar traces no Jaeger UI e logs no Grafana"
 echo ""
 echo "🔧 Comandos úteis:"
-echo "   - Testar aplicação: curl http://localhost/"
-echo "   - Gerar logs: curl http://localhost/generate/50"
-echo "   - Ver logs da stack: cd /home/ubuntu/repo/test-app && docker-compose -f docker-compose-app.yml logs -f"
-echo "   - Status da stack: cd /home/ubuntu/repo/test-app && docker-compose -f docker-compose-app.yml ps"
+echo "   - Testar frontend: curl http://localhost/"
+echo "   - Listar usuários: curl http://localhost/api/users"
+echo "   - Listar produtos: curl http://localhost/api/products"
+echo "   - Criar pedido: curl -X POST http://localhost/api/orders -H 'Content-Type: application/json' -d '{\"user_id\":1,\"total_amount\":99.99}'"
+echo "   - Ver logs da stack: cd /home/ubuntu/repo/distributed-app && docker-compose -f docker-compose-app.yml logs -f"
+echo "   - Status da stack: cd /home/ubuntu/repo/distributed-app && docker-compose -f docker-compose-app.yml ps"
 echo "   - Verificar Promtail: curl http://localhost:9080/metrics"
 echo "   - Logs de instalação: sudo tail -f /var/log/user-data.log"
 
@@ -159,15 +165,22 @@ echo "   - Logs de instalação: sudo tail -f /var/log/user-data.log"
 # - Logs específicos: docker-compose -f docker-compose-app.yml logs [service]
 #
 # ARQUIVOS DE CONFIGURAÇÃO:
-# - Docker Compose: /home/ubuntu/repo/test-app/docker-compose-app.yml
-# - Promtail config: /home/ubuntu/repo/test-app/promtail-app-config.yml
-# - Nginx config: /home/ubuntu/repo/test-app/nginx.conf
-# - Aplicação: /home/ubuntu/repo/test-app/test-app.py
+# - Docker Compose: /home/ubuntu/repo/distributed-app/docker-compose-app.yml
+# - Promtail config: /home/ubuntu/repo/distributed-app/promtail-app-config.yml
+# - Jaeger Agent config: /home/ubuntu/repo/distributed-app/jaeger-agent-config.yml
+# - Frontend: /home/ubuntu/repo/distributed-app/frontend/
+# - Backend: /home/ubuntu/repo/distributed-app/backend/
 #
 # PORTAS UTILIZADAS:
 # - 22: SSH
-# - 80: HTTP (Nginx + Aplicação)
-# - 5000: Aplicação Python (interno)
+# - 80: HTTP (Frontend)
+# - 5000: Backend API
+# - 5432: PostgreSQL
+# - 6379: Redis
+# - 5672: RabbitMQ AMQP
+# - 15672: RabbitMQ Management UI
+# - 6831/6832: Jaeger Agent (UDP)
+# - 5778: Jaeger Agent HTTP
 # - 9080: Promtail (métricas)
 #
 # COMANDOS DE MANUTENÇÃO:
@@ -176,16 +189,20 @@ echo "   - Logs de instalação: sudo tail -f /var/log/user-data.log"
 # - Iniciar stack: docker-compose -f docker-compose-app.yml up -d
 # - Ver logs: docker-compose -f docker-compose-app.yml logs -f
 # - Status: docker-compose -f docker-compose-app.yml ps
+# - Rebuild serviços: docker-compose -f docker-compose-app.yml build
 #
 # CONFIGURAÇÃO FINAL NECESSÁRIA:
-# 1. Substituir LOKI_SERVER_IP pelo IP real da instância 1 em promtail-app-config.yml
-# 2. Verificar coleta de logs no Grafana
-# 3. Testar geração de logs da aplicação
+# 1. Substituir JAEGER_COLLECTOR_IP pelo IP real da instância 1 em docker-compose-app.yml
+# 2. Substituir LOKI_SERVER_IP pelo IP real da instância 1 em promtail-app-config.yml
+# 3. Verificar traces no Jaeger UI
+# 4. Verificar logs correlacionados no Grafana
+# 5. Testar correlação entre traces, logs e métricas
 #
-# ENDPOINTS DA APLICAÇÃO:
-# - GET /: Página inicial com estatísticas
-# - GET /generate/<count>: Gera <count> logs de teste
-# - GET /health: Status da aplicação
-# - GET /stress: Gera logs por 30 segundos
-# - GET /error: Força um erro para teste
+# ENDPOINTS DAS APLICAÇÕES:
+# - GET /: Página inicial do frontend
+# - GET /health: Health check (frontend e backend)
+# - GET /api/users: Lista usuários (com cache)
+# - GET /api/products: Lista produtos (com cache)
+# - GET /api/orders: Lista pedidos
+# - POST /api/orders: Cria novo pedido (operação complexa)
 # =============================================================================

@@ -1,0 +1,30 @@
+{
+  "name": "frontend-service",
+  "version": "1.0.0",
+  "description": "Frontend service with Jaeger tracing",
+  "main": "server.js",
+  "scripts": {
+    "start": "node -r ./tracing.js server.js",
+    "dev": "nodemon -r ./tracing.js server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "axios": "^1.4.0",
+    "cors": "^2.8.5",
+    "winston": "^3.10.0",
+    "jaeger-client": "^3.19.0",
+    "opentracing": "^0.14.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "jaeger",
+    "tracing",
+    "observability"
+  ],
+  "author": "PosTech DevOps",
+  "license": "MIT"
+}
