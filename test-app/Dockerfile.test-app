@@ -1,0 +1,36 @@
+# =============================================================================
+# DOCKERFILE - TEST APPLICATION
+# =============================================================================
+# Dockerfile para aplicação de teste que gera logs abundantes
+# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# =============================================================================
+
+FROM python:3.11-slim
+
+# Definir diretório de trabalho
+WORKDIR /app
+
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copiar requirements e instalar dependências Python
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copiar código da aplicação
+COPY test-app.py .
+
+# Criar diretório para logs
+RUN mkdir -p /app/logs
+
+# Expor porta da aplicação
+EXPOSE 5000
+
+# Definir usuário não-root para segurança
+RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
+# Comando para iniciar a aplicação
+CMD ["python", "test-app.py"]

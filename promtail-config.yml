@@ -1,0 +1,162 @@
+# =============================================================================
+# PROMTAIL CONFIGURATION - OBSERVABILITY INSTANCE
+# =============================================================================
+# Configuração do Promtail para coleta de logs da instância de observabilidade
+# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Foco: Coleta de logs dos próprios serviços de observabilidade
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DO SERVIDOR
+# -----------------------------------------------------------------------------
+server:
+  http_listen_port: 9080                    # Porta HTTP para métricas e healthcheck
+  grpc_listen_port: 0                       # Porta gRPC (0 = desabilitado)
+  log_level: info                           # Nível de log (debug, info, warn, error)
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DE POSIÇÕES (Controle de leitura de arquivos)
+# -----------------------------------------------------------------------------
+positions:
+  filename: /tmp/positions/positions.yaml   # Arquivo para salvar posições de leitura
+  sync_period: 10s                          # Intervalo de sincronização das posições
+  ignore_invalid_yaml: false                # Ignora YAML inválido no arquivo de posições
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DO CLIENTE LOKI
+# -----------------------------------------------------------------------------
+clients:
+  - url: http://loki:3100/loki/api/v1/push  # URL da API do Loki para envio de logs
+    tenant_id: ""                           # ID do tenant (vazio para single-tenant)
+    
+    # Configurações de batching (agrupamento de logs)
+    batchwait: 1s                           # Tempo de espera antes de enviar batch
+    batchsize: 1048576                      # Tamanho máximo do batch (1MB)
+    
+    # Configurações de retry (tentativas de reenvio)
+    backoff_config:
+      min_period: 500ms                     # Período mínimo entre tentativas
+      max_period: 5m                        # Período máximo entre tentativas
+      max_retries: 10                       # Número máximo de tentativas
+    
+    # Configurações de timeout
+    timeout: 10s                            # Timeout para requisições HTTP
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DE COLETA DE LOGS (SCRAPE CONFIGS)
+# -----------------------------------------------------------------------------
+scrape_configs:
+  
+  # ---------------------------------------------------------------------------
+  # JOB 1: LOGS DO SISTEMA (SYSLOG)
+  # ---------------------------------------------------------------------------
+  - job_name: syslog
+    
+    static_configs:
+      - targets:
+          - localhost                       # Target local
+        labels:
+          job: syslog                       # Label identificando o job
+          host: observability-server        # Label identificando o host
+          service: system                   # Label identificando o serviço
+          __path__: /var/log/syslog         # Caminho do arquivo de syslog
+    
+    # Pipeline básico para syslog
+    pipeline_stages:
+      
+      # Parsing básico do syslog
+      - regex:
+          expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s*(?P<message>.*)'
+          source: ""
+      
+      # Adicionar labels
+      - labels:
+          hostname: hostname
+          syslog_service: service
+      
+      # Parsing de timestamp do syslog
+      - timestamp:
+          source: timestamp
+          format: 'Jan 02 15:04:05'
+          fallback_formats:
+            - "2006-01-02T15:04:05.000Z"
+            - "2006-01-02 15:04:05"
+
+  # ---------------------------------------------------------------------------
+  # JOB 2: LOGS DE CONTAINERS DOCKER (OBSERVABILIDADE)
+  # ---------------------------------------------------------------------------
+  - job_name: docker-observability
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker-observability
+          host: observability-server
+          service: docker
+          __path__: /var/lib/docker/containers/*/*log
+    
+    # Pipeline para logs de containers Docker
+    pipeline_stages:
+      
+      # Parsing do formato JSON dos logs do Docker
+      - json:
+          expressions:
+            output: log                     # Extrai campo 'log' do JSON
+            stream: stream                  # Extrai campo 'stream' (stdout/stderr)
+            time: time                      # Extrai campo 'time'
+      
+      # Adicionar labels baseados no stream
+      - labels:
+          stream: stream                    # Adiciona stream como label
+      
+      # Parsing de timestamp do Docker
+      - timestamp:
+          source: time                      # Campo de origem do timestamp
+          format: RFC3339Nano               # Formato timestamp do Docker
+      
+      # Usar o campo 'output' como conteúdo da linha
+      - output:
+          source: output                    # Define 'output' como conteúdo final
+      
+      # Extrair nome do container do path
+      - regex:
+          expression: '/var/lib/docker/containers/(?P<container_id>[^/]+)/.*'
+          source: __path__
+      
+      # Adicionar container_id como label
+      - labels:
+          container_id: container_id        # Adiciona ID do container como label
+
+# =============================================================================
+# INTEGRAÇÃO COM LOKI - INSTÂNCIA 1:
+# =============================================================================
+# 1. Este Promtail coleta logs da própria instância de observabilidade
+# 2. Foco em logs dos serviços Grafana, Loki, Prometheus
+# 3. Labels organizados por job, service, stream
+# 4. Correlação com métricas do Prometheus
+#
+# CONSULTAS LOGQL RESULTANTES:
+# - {job="syslog"}: Logs do sistema
+# - {job="docker-observability"}: Logs dos containers de observabilidade
+# - {service="grafana"}: Logs específicos do Grafana
+# - {service="loki"}: Logs específicos do Loki
+# - {service="prometheus"}: Logs específicos do Prometheus
+# =============================================================================
+#
+# CORRELAÇÃO COM MÉTRICAS:
+# =============================================================================
+# Use estas consultas em dashboards Grafana para correlacionar:
+#
+# 1. Volume de logs vs métricas:
+#    - LogQL: rate({job="docker-observability"}[5m])
+#    - PromQL: rate(promtail_sent_entries_total[5m])
+#
+# 2. Erros nos serviços:
+#    - LogQL: {job="docker-observability"} |= "error"
+#    - PromQL: up{job="loki"}
+#
+# 3. Performance do Loki:
+#    - LogQL: {service="loki"} |= "slow"
+#    - PromQL: loki_ingester_chunks_created_total
+# =============================================================================

@@ -1,0 +1,178 @@
+# =============================================================================
+# DOCKER COMPOSE - LOKI OBSERVABILITY STACK
+# =============================================================================
+# Este arquivo configura uma stack de observabilidade com Grafana,
+# Prometheus, Loki e Promtail para a Aula 04 do curso PosTech DevOps
+# Foco: Logs centralizados com Loki e correlação básica com métricas
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # GRAFANA - Plataforma de visualização unificada (logs + métricas)
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    
+    # Porta de acesso à interface web do Grafana
+    ports:
+      - "3000:3000"
+    
+    # Variáveis de ambiente para configuração inicial
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123     # Senha do admin (ALTERAR EM PRODUÇÃO)
+      - GF_USERS_ALLOW_SIGN_UP=false            # Desabilita auto-registro
+      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor # Habilita editor TraceQL para futuras integrações
+    
+    # Volumes para dados persistentes e configurações
+    volumes:
+      - grafana-data:/var/lib/grafana            # Dados persistentes do Grafana
+      - grafana-config:/etc/grafana              # Configurações personalizadas
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Aguarda outros serviços estarem prontos
+    depends_on:
+      - prometheus
+      - loki
+
+  # ---------------------------------------------------------------------------
+  # PROMETHEUS SERVER - Coleta e armazenamento de métricas
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    
+    # Porta de acesso à interface web do Prometheus
+    ports:
+      - "9090:9090"
+    
+    # Volumes para configuração e dados persistentes
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml           # Configuração principal
+      - prometheus-data:/prometheus                               # Dados persistentes
+    
+    # Parâmetros de inicialização do Prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'           # Arquivo de configuração
+      - '--storage.tsdb.path=/prometheus'                        # Caminho dos dados
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'                     # Retenção de dados: 200 horas
+      - '--web.enable-lifecycle'                                 # Permite reload via API
+      - '--web.enable-admin-api'                                 # Habilita API administrativa
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # LOKI - Sistema de agregação de logs
+  # ---------------------------------------------------------------------------
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    
+    # Porta de acesso à API do Loki
+    ports:
+      - "3100:3100"
+    
+    # Volumes para configuração e dados persistentes
+    volumes:
+      - ./loki-config.yml:/etc/loki/local-config.yaml    # Configuração do Loki
+      - loki-data:/loki                                   # Dados persistentes dos logs
+    
+    # Parâmetros de inicialização do Loki
+    command: -config.file=/etc/loki/local-config.yaml
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Healthcheck para garantir que Loki está pronto
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3100/ready || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
+  # PROMTAIL - Agente de coleta de logs para Loki
+  # ---------------------------------------------------------------------------
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    
+    # Volumes para configuração e acesso aos logs
+    volumes:
+      - ./promtail-config.yml:/etc/promtail/config.yml   # Configuração do Promtail
+      - /var/log:/var/log:ro                             # Logs do sistema (somente leitura)
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro  # Logs dos containers
+      - promtail-positions:/tmp/positions                # Posições de leitura dos arquivos
+    
+    # Parâmetros de inicialização do Promtail
+    command: -config.file=/etc/promtail/config.yml
+    
+    networks:
+      - monitoring
+    restart: unless-stopped
+    
+    # Aguarda Loki estar saudável antes de iniciar
+    depends_on:
+      loki:
+        condition: service_healthy
+
+# -----------------------------------------------------------------------------
+# VOLUMES PERSISTENTES - Para manter dados entre reinicializações
+# -----------------------------------------------------------------------------
+volumes:
+  grafana-data:         # Dados do Grafana (dashboards, usuários, configurações)
+  grafana-config:       # Configurações personalizadas do Grafana
+  prometheus-data:      # Dados do Prometheus (métricas, índices)
+  loki-data:            # Dados do Loki (logs, índices, chunks)
+  promtail-positions:   # Posições de leitura dos arquivos de log pelo Promtail
+
+# -----------------------------------------------------------------------------
+# REDES - Rede interna para comunicação entre serviços
+# -----------------------------------------------------------------------------
+networks:
+  monitoring:
+    driver: bridge
+
+# =============================================================================
+# INSTRUÇÕES DE USO - AULA 04:
+# =============================================================================
+# 1. Para iniciar a stack completa:
+#    docker-compose up -d
+#
+# 2. Para acessar as interfaces:
+#    - Grafana: http://IP_SERVIDOR:3000 (admin/admin123)
+#    - Prometheus: http://IP_SERVIDOR:9090
+#    - Loki: http://IP_SERVIDOR:3100 (API - não tem interface web)
+#
+# 3. Configurar Data Sources no Grafana:
+#    - Prometheus: http://prometheus:9090
+#    - Loki: http://loki:3100
+#
+# 4. Para ver logs:
+#    docker-compose logs -f [nome_do_serviço]
+#
+# 5. Para parar a stack:
+#    docker-compose down
+# =============================================================================
+#
+# INTEGRAÇÃO GRAFANA + PROMETHEUS + LOKI:
+# =============================================================================
+# 1. Grafana como frontend unificado para logs e métricas
+# 2. Prometheus para métricas básicas (próprio Prometheus e Promtail)
+# 3. Loki para logs centralizados (sistema, aplicações, containers)
+# 4. Promtail para coleta automática de logs da instância 2
+# 5. Dashboards combinando logs e métricas básicas
+# 6. Correlação temporal entre eventos de logs e métricas
+# 7. Foco educacional: aprender LogQL e correlação logs + métricas
+# =============================================================================

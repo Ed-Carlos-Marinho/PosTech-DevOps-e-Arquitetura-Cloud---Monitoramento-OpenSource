@@ -159,7 +159,7 @@ check_status "Inicialização do code-server"
 echo "🔥 Configurando firewall..."
 ufw --force enable                          # Habilita firewall (força sem prompt)
 ufw allow ssh                               # Permite SSH (porta 22)
-ufw allow http                              # Permite HTTP (porta 80) - para Zabbix
+ufw allow http                              # Permite HTTP (porta 80) - para aplicações web
 ufw allow 8080                              # Permite porta 8080 - para code-server
 check_status "Configuração do firewall"
 
@@ -197,10 +197,11 @@ echo "🐳 Docker e Docker Compose instalados e configurados"
 #
 # PORTAS UTILIZADAS:
 # - 22: SSH
-# - 80: HTTP (Zabbix web interface)
+# - 80: HTTP (aplicações web)
 # - 8080: Code-server
-# - 10050: Zabbix Agent (se configurado)
-# - 10051: Zabbix Server (se configurado)
+# - 3000: Grafana
+# - 3100: Loki API
+# - 9090: Prometheus
 #
 # SEGURANÇA EM PRODUÇÃO:
 # - Alterar senha padrão do code-server (demo123)

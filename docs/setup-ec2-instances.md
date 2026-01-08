@@ -1,18 +1,17 @@
-# Setup de Instâncias EC2 para Grafana
+# Setup de Instâncias EC2 para Loki
 
-Guia para criar duas instâncias EC2: uma para o stack completo de monitoramento (Grafana + Prometheus + Zabbix) e outra para ser monitorada.
+Guia para criar duas instâncias EC2: uma para o stack completo de observabilidade (Grafana + Prometheus + Loki) e outra para aplicação de teste com geração de logs.
 
 ## Arquitetura
 
-- **Instância 1**: Stack de Monitoramento (t4g.medium - ARM64 com user data)
-  - Grafana (visualização)
-  - Prometheus (métricas modernas)
-  - Zabbix Server (monitoramento tradicional)
-  - Alertmanager (alertas)
-- **Instância 2**: Host monitorado (t3.small - AMD64 para exporters)
-  - Node Exporter
-  - cAdvisor
-  - Zabbix Agent
+- **Instância 1**: Stack de Observabilidade (t4g.medium - ARM64)
+  - Grafana (visualização unificada)
+  - Loki (logs centralizados)
+  - Prometheus (métricas básicas)
+- **Instância 2**: Aplicação de Teste (t3.small - AMD64)
+  - Promtail (coleta de logs)
+  - Aplicação web de teste (gera logs abundantes)
+  - Nginx (proxy e logs de acesso)
 
 ## Pré-requisitos
 
@@ -21,8 +20,8 @@ Guia para criar duas instâncias EC2: uma para o stack completo de monitoramento
 - VPC e Subnet configuradas
 
 **Importante sobre as arquiteturas:**
-- **t4g.medium** (ARM64): Para stack completa de monitoramento com Docker (4GB RAM recomendado)
-- **t3.small** (AMD64): Para host monitorado com exporters
+- **t4g.medium** (ARM64): Para stack de observabilidade com Docker (4GB RAM recomendado)
+- **t3.small** (AMD64): Para aplicação de teste e Promtail
 
 ## Passo 1: Criar IAM Role para SSM
 
@@ -82,41 +81,38 @@ aws iam add-role-to-instance-profile \
 
 ## Passo 2: Criar Security Groups
 
-### Security Group para Stack de Monitoramento
+### Security Group para Stack de Observabilidade
 ```bash
-# Nome: grafana-monitoring-sg
-# Descrição: Security group para stack completa de monitoramento (Grafana + Prometheus + Zabbix)
+# Nome: loki-observability-sg
+# Descrição: Security group para stack de observabilidade (Grafana + Prometheus + Loki)
 ```
 
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
 - Custom TCP (8080) - Source: 0.0.0.0/0 (code-server)
 - Custom TCP (3000) - Source: 0.0.0.0/0 (Grafana web)
+- Custom TCP (3100) - Source: VPC CIDR (Loki API)
 - Custom TCP (9090) - Source: 0.0.0.0/0 (Prometheus web)
-- Custom TCP (9093) - Source: 0.0.0.0/0 (Alertmanager web)
-- Custom TCP (8080) - Source: 0.0.0.0/0 (Zabbix web)
-- Custom TCP (10051) - Source: VPC CIDR (Zabbix server)
 
-### Security Group para Exporters
+### Security Group para Aplicação de Teste
 ```bash
-# Nome: monitoring-exporters-sg
-# Descrição: Security group para instâncias com exporters
+# Nome: test-app-sg
+# Descrição: Security group para instância com aplicação de teste e Promtail
 ```
 
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
-- Custom TCP (9100) - Source: Security Group da Stack de Monitoramento (Node Exporter)
-- Custom TCP (8080) - Source: Security Group da Stack de Monitoramento (cAdvisor)
-- Custom TCP (10050) - Source: Security Group da Stack de Monitoramento (Zabbix Agent)
+- Custom TCP (80) - Source: 0.0.0.0/0 (Aplicação web via Nginx)
+- Custom TCP (9080) - Source: Security Group da Stack de Observabilidade (Promtail metrics)
 
-## Passo 3: Criar Instância da Stack de Monitoramento
+## Passo 3: Criar Instância da Stack de Observabilidade
 
 ### Via Console AWS
 
 1. **EC2 Dashboard** → **Launch Instance**
 
 2. **Configurações básicas:**
-   - Name: `grafana-monitoring-server`
+   - Name: `loki-observability-server`
    - AMI: Ubuntu Server 24.04 LTS
    - Instance type: t4g.medium
    - Key pair: Selecione sua chave
@@ -125,7 +121,7 @@ aws iam add-role-to-instance-profile \
    - VPC: Default ou sua VPC
    - Subnet: Pública
    - Auto-assign public IP: Enable
-   - Security group: `grafana-monitoring-sg`
+   - Security group: `loki-observability-sg`
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
@@ -144,44 +140,45 @@ aws ec2 run-instances \
   --associate-public-ip-address \
   --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
   --user-data file://ec2-userdata-instance-01.sh \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=grafana-monitoring-server}]'
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=loki-observability-server}]'
 ```
 
-## Passo 4: Criar Instância para Exporters
+## Passo 4: Criar Instância para Aplicação de Teste
 
 ### Via Console AWS
 
 1. **EC2 Dashboard** → **Launch Instance**
 
 2. **Configurações básicas:**
-   - Name: `monitored-host-01`
+   - Name: `test-app-server`
    - AMI: Ubuntu Server 24.04 LTS
    - Instance type: t3.small
    - Key pair: Selecione sua chave
 
 3. **Network settings:**
-   - VPC: Mesma do Prometheus Server
+   - VPC: Mesma da instância de observabilidade
    - Subnet: Mesma ou diferente (mesma AZ recomendada)
    - Auto-assign public IP: Enable
-   - Security group: `monitoring-exporters-sg`
+   - Security group: `test-app-sg`
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
    - User data: Cole o conteúdo do `ec2-userdata-instance-02.sh`
 
-5. **Launch instance** (sem user data)
+5. **Launch instance**
 
 ### Via AWS CLI
 ```bash
 aws ec2 run-instances \
   --image-id ami-0c7217cdde317cfec \
-  --instance-type t4g.small \
+  --instance-type t3.small \
   --key-name sua-chave \
   --security-group-ids sg-yyyyyyyyy \
   --subnet-id subnet-xxxxxxxxx \
   --associate-public-ip-address \
+  --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
   --user-data file://ec2-userdata-instance-02.sh \
-  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=monitored-host-01}]'
+  --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=test-app-server}]'
 ```
 
 ## Passo 5: Clonar repositório com os arquivos
@@ -194,12 +191,12 @@ cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
 ```
 
 Os arquivos estarão disponíveis:
-- `docker-compose.yml` - Para subir a stack completa de monitoramento
+- `docker-compose-observability.yml` - Para subir a stack de observabilidade
 - `ec2-userdata-instance-01.sh` - Script usado no user data da instância 1
 - `ec2-userdata-instance-02.sh` - Script usado no user data da instância 2
-- `prometheus.yml`, `alertmanager.yml`, `alert_rules.yml` - Configurações
+- `prometheus.yml`, `loki-config.yml`, `promtail-config.yml` - Configurações
 - `setup-ec2-instances.md` - Este guia
-- `grafana-compose.md` - Documentação da stack completa
+- `loki-compose.md` - Documentação da stack de observabilidade
 
 ## Passo 6: Verificar Stack de Monitoramento
 
@@ -228,15 +225,14 @@ docker-compose --version
 - **Code-server**: `http://IP_MONITORING_SERVER:8080` (senha: demo123)
 - **Grafana**: `http://IP_MONITORING_SERVER:3000` (admin/admin123)
 - **Prometheus**: `http://IP_MONITORING_SERVER:9090`
-- **Alertmanager**: `http://IP_MONITORING_SERVER:9093`
-- **Zabbix**: `http://IP_MONITORING_SERVER:8080` (Admin/zabbix)
+- **Loki**: `http://IP_MONITORING_SERVER:3100` (API - sem interface web)
 
-## Passo 7: Verificar instância monitorada
+## Passo 7: Verificar instância de aplicação de teste
 
-### Conectar na instância monitorada
+### Conectar na instância de aplicação
 ```bash
 # Via SSH
-ssh -i sua-chave.pem ubuntu@IP_MONITORED_HOST
+ssh -i sua-chave.pem ubuntu@IP_TEST_APP_HOST
 
 # OU via SSM (recomendado)
 aws ssm start-session --target i-0987654321fedcba0
@@ -247,46 +243,56 @@ aws ssm start-session --target i-0987654321fedcba0
 # Verificar user data
 sudo tail -f /var/log/user-data.log
 
-# Verificar Node Exporter
-sudo systemctl status node_exporter
-curl http://localhost:9100/metrics
+# Verificar aplicação de teste
+curl http://localhost/
 
 # Verificar cAdvisor
-docker ps | grep cadvisor
-curl http://localhost:8080/metrics
+# Verificar Promtail
+curl http://localhost:9080/metrics
 
-# Verificar Zabbix Agent (ainda não iniciado)
-sudo systemctl status zabbix-agent
+# Verificar aplicação de teste
+curl http://localhost/generate/10
 ```
 
-### Configurar IP do Zabbix Server
+### Configurar IP do Loki
 ```bash
-# Obter IP privado da instância de monitoramento
-# Substituir ZABBIX_SERVER_IP pelo IP real
-sudo sed -i 's/ZABBIX_SERVER_IP/IP_PRIVADO_INSTANCIA_1/' /etc/zabbix/zabbix_agentd.conf
+# Obter IP privado da instância de observabilidade
+# Editar configuração do Promtail
+cd /home/ubuntu/repo/test-app
+nano promtail-app-config.yml
 
-# Iniciar Zabbix Agent
-sudo systemctl start zabbix-agent
-sudo systemctl status zabbix-agent
+# Substituir LOKI_SERVER_IP pelo IP real
+sed -i 's/LOKI_SERVER_IP/IP_PRIVADO_INSTANCIA_1/' promtail-app-config.yml
+
+# Reiniciar Promtail
+docker-compose -f docker-compose-app.yml restart promtail
 ```
 
 ## Passo 8: Configurar integração no Grafana
 
-### Atualizar configuração
-1. **Editar prometheus.yml** na instância do Prometheus Server
-2. **Substituir IPs** pelos IPs privados reais das instâncias
-3. **Recarregar configuração**: `docker-compose restart prometheus`
-
 ### Verificar targets
 1. **Acessar Prometheus Web**: `http://IP_PROMETHEUS_SERVER:9090`
 2. **Status** → **Targets**
-3. **Verificar** se todos os exporters estão "UP"
+3. **Verificar** se todos os serviços estão "UP"
 
-### Testar consultas PromQL
+### Configurar Data Sources no Grafana
+1. **Prometheus**: `http://prometheus:9090`
+2. **Loki**: `http://loki:3100`
+
+### Testar consultas
+#### PromQL (Prometheus)
 - `up` - Status de todos os targets
-- `node_cpu_seconds_total` - Métricas de CPU
-- `container_memory_usage_bytes` - Métricas de containers
-- `rate(node_cpu_seconds_total[5m])` - Taxa de uso de CPU
+- `prometheus_tsdb_samples_appended_total` - Métricas do Prometheus
+- `loki_ingester_streams` - Streams do Loki
+- `promtail_sent_entries_total` - Logs enviados pelo Promtail
+
+#### LogQL (Loki)
+- `{job="test-app"}` - Logs da aplicação de teste
+- `{job="nginx-access"}` - Logs de acesso do Nginx
+- `{job="syslog"}` - Logs do sistema
+- `{level="error"}` - Todos os logs de erro
+- `{job="varlogs"} |= "error"` - Logs contendo "error"
+- `rate({job="varlogs"}[5m])` - Taxa de logs por segundo
 
 ## Verificação final
 
@@ -295,22 +301,34 @@ sudo systemctl status zabbix-agent
 - Métricas começam a ser coletadas automaticamente
 - Alertas configurados começam a funcionar
 
+### No Loki
+- Logs começam a ser coletados pelo Promtail automaticamente
+- Verificar no Grafana se Data Source Loki está funcionando
+- Testar consultas LogQL básicas
+
 ### Comandos úteis
 ```bash
 # Testar conectividade do Prometheus para exporters
 telnet IP_EXPORTERS_HOST 9100
 telnet IP_EXPORTERS_HOST 8080
 
+# Testar conectividade do Loki para Promtail
+telnet IP_EXPORTERS_HOST 9080
+
 # Ver logs dos exporters
 sudo journalctl -u node_exporter -f
-sudo journalctl -u cadvisor -f
+sudo journalctl -u promtail -f
 
 # Testar métricas localmente
 curl http://localhost:9100/metrics
 curl http://localhost:8080/metrics
+curl http://localhost:9080/metrics
 
 # Verificar configuração do Prometheus
 docker-compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+
+# Verificar se Loki está recebendo logs
+curl http://localhost:3100/metrics | grep loki_ingester_streams
 ```
 
 ## Troubleshooting
@@ -321,11 +339,26 @@ docker-compose exec prometheus promtool check config /etc/prometheus/prometheus.
 - Verificar se serviços estão rodando: `systemctl status node_exporter cadvisor`
 
 ### Prometheus não coleta métricas
-- Verificar logs: `docker-compose logs prometheus`
+- Verificar logs: `docker-compose -f docker-compose-observability.yml logs prometheus`
 - Verificar targets em Status → Targets
 - Testar conectividade de rede entre instâncias
 
-### Alertmanager não funciona
-- Verificar logs: `docker-compose logs alertmanager`
-- Verificar configuração: `/etc/alertmanager/alertmanager.yml`
-- Testar regras de alerta no Prometheus
+### Loki não recebe logs
+- Verificar logs: `docker-compose -f docker-compose-observability.yml logs loki`
+- Verificar se Promtail está conectado: `docker-compose -f docker-compose-observability.yml logs promtail`
+- Testar API do Loki: `curl http://localhost:3100/ready`
+
+### Logs não aparecem no Grafana
+```bash
+# Verificar Data Source Loki no Grafana
+# Configuration → Data Sources → Loki → Test
+
+# Verificar se Promtail está enviando logs
+curl http://localhost:9080/metrics | grep promtail_sent_entries_total
+
+# Verificar se Loki está recebendo logs
+curl http://localhost:3100/metrics | grep loki_ingester_streams
+
+# Testar consulta LogQL simples no Grafana
+{job="varlogs"}
+```

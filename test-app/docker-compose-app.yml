@@ -1,0 +1,172 @@
+# =============================================================================
+# DOCKER COMPOSE - TEST APPLICATION STACK
+# =============================================================================
+# Este arquivo configura a aplicação de teste para geração de logs
+# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Foco: Aplicação que gera logs abundantes para coleta pelo Loki
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # TEST APPLICATION - Aplicação Python que gera logs
+  # ---------------------------------------------------------------------------
+  test-app:
+    build:
+      context: .
+      dockerfile: Dockerfile.test-app
+    container_name: test-app
+    
+    # Porta interna da aplicação
+    ports:
+      - "5000:5000"
+    
+    # Variáveis de ambiente
+    environment:
+      - FLASK_ENV=production
+      - LOG_LEVEL=INFO
+    
+    # Volumes para logs persistentes
+    volumes:
+      - app-logs:/app/logs                    # Logs da aplicação
+    
+    networks:
+      - app-network
+    restart: unless-stopped
+    
+    # Healthcheck para verificar se aplicação está saudável
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # NGINX - Proxy reverso e gerador de logs de acesso
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:latest
+    container_name: nginx-proxy
+    
+    # Porta de acesso externa
+    ports:
+      - "80:80"
+    
+    # Volumes para configuração e logs
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf    # Configuração personalizada
+      - nginx-logs:/var/log/nginx             # Logs do Nginx
+    
+    networks:
+      - app-network
+    restart: unless-stopped
+    
+    # Aguarda aplicação estar saudável
+    depends_on:
+      test-app:
+        condition: service_healthy
+
+  # ---------------------------------------------------------------------------
+  # PROMTAIL - Coleta de logs para envio ao Loki
+  # ---------------------------------------------------------------------------
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    
+    # Porta para métricas do Promtail
+    ports:
+      - "9080:9080"
+    
+    # Volumes para configuração e acesso aos logs
+    volumes:
+      - ./promtail-app-config.yml:/etc/promtail/config.yml  # Configuração do Promtail
+      - app-logs:/app/logs:ro                               # Logs da aplicação (somente leitura)
+      - nginx-logs:/var/log/nginx:ro                        # Logs do Nginx (somente leitura)
+      - /var/log:/var/log:ro                                # Logs do sistema (somente leitura)
+      - promtail-positions:/tmp/positions                   # Posições de leitura dos arquivos
+    
+    # Parâmetros de inicialização do Promtail
+    command: -config.file=/etc/promtail/config.yml
+    
+    networks:
+      - app-network
+    restart: unless-stopped
+    
+    # Aguarda outros serviços estarem prontos
+    depends_on:
+      - test-app
+      - nginx
+
+  # ---------------------------------------------------------------------------
+  # LOG GENERATOR - Gerador adicional de logs para testes
+  # ---------------------------------------------------------------------------
+  log-generator:
+    image: alpine:latest
+    container_name: log-generator
+    
+    # Volumes para logs
+    volumes:
+      - app-logs:/app/logs
+    
+    # Script que gera logs continuamente
+    command: >
+      sh -c "
+        while true; do
+          echo \"\$(date '+%Y-%m-%d %H:%M:%S') - log-generator - INFO - Generated log entry \$$RANDOM\" >> /app/logs/generator.log;
+          echo \"\$(date '+%Y-%m-%d %H:%M:%S') - log-generator - WARNING - Random warning \$$RANDOM\" >> /app/logs/generator.log;
+          if [ \$$((RANDOM % 10)) -eq 0 ]; then
+            echo \"\$(date '+%Y-%m-%d %H:%M:%S') - log-generator - ERROR - Random error occurred \$$RANDOM\" >> /app/logs/generator.log;
+          fi;
+          sleep \$$((RANDOM % 5 + 1));
+        done
+      "
+    
+    networks:
+      - app-network
+    restart: unless-stopped
+
+# -----------------------------------------------------------------------------
+# VOLUMES PERSISTENTES - Para manter logs entre reinicializações
+# -----------------------------------------------------------------------------
+volumes:
+  app-logs:             # Logs das aplicações
+  nginx-logs:           # Logs do Nginx
+  promtail-positions:   # Posições de leitura dos arquivos de log pelo Promtail
+
+# -----------------------------------------------------------------------------
+# REDES - Rede interna para comunicação entre serviços
+# -----------------------------------------------------------------------------
+networks:
+  app-network:
+    driver: bridge
+
+# =============================================================================
+# INSTRUÇÕES DE USO - INSTÂNCIA 2:
+# =============================================================================
+# 1. Para iniciar a stack de aplicação:
+#    docker-compose -f docker-compose-app.yml up -d
+#
+# 2. Para acessar a aplicação:
+#    - Aplicação via Nginx: http://IP_INSTANCIA_2
+#    - Aplicação direta: http://IP_INSTANCIA_2:5000
+#    - Métricas Promtail: http://IP_INSTANCIA_2:9080/metrics
+#
+# 3. Para gerar logs de teste:
+#    curl http://IP_INSTANCIA_2/generate/100
+#
+# 4. Para ver logs:
+#    docker-compose -f docker-compose-app.yml logs -f test-app
+#    docker-compose -f docker-compose-app.yml logs -f nginx
+#    docker-compose -f docker-compose-app.yml logs -f promtail
+#
+# 5. Para parar a stack:
+#    docker-compose -f docker-compose-app.yml down
+# =============================================================================
+#
+# CONFIGURAÇÃO DO PROMTAIL:
+# =============================================================================
+# 1. Editar promtail-app-config.yml
+# 2. Substituir LOKI_SERVER_IP pelo IP real da Instância 1
+# 3. Reiniciar: docker-compose -f docker-compose-app.yml restart promtail
+# =============================================================================

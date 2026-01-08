@@ -1,0 +1,300 @@
+# =============================================================================
+# PROMTAIL CONFIGURATION - TEST APPLICATION INSTANCE
+# =============================================================================
+# Configuração do Promtail para coleta de logs da aplicação de teste
+# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Foco: Coleta de logs da aplicação de teste e Nginx
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DO SERVIDOR
+# -----------------------------------------------------------------------------
+server:
+  http_listen_port: 9080                    # Porta HTTP para métricas e healthcheck
+  grpc_listen_port: 0                       # Porta gRPC (0 = desabilitado)
+  log_level: info                           # Nível de log (debug, info, warn, error)
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DE POSIÇÕES (Controle de leitura de arquivos)
+# -----------------------------------------------------------------------------
+positions:
+  filename: /tmp/positions/positions.yaml   # Arquivo para salvar posições de leitura
+  sync_period: 10s                          # Intervalo de sincronização das posições
+  ignore_invalid_yaml: false                # Ignora YAML inválido no arquivo de posições
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DO CLIENTE LOKI
+# -----------------------------------------------------------------------------
+clients:
+  - url: http://LOKI_SERVER_IP:3100/loki/api/v1/push  # URL da API do Loki para envio de logs
+    tenant_id: ""                           # ID do tenant (vazio para single-tenant)
+    
+    # Configurações de batching (agrupamento de logs)
+    batchwait: 1s                           # Tempo de espera antes de enviar batch
+    batchsize: 1048576                      # Tamanho máximo do batch (1MB)
+    
+    # Configurações de retry (tentativas de reenvio)
+    backoff_config:
+      min_period: 500ms                     # Período mínimo entre tentativas
+      max_period: 5m                        # Período máximo entre tentativas
+      max_retries: 10                       # Número máximo de tentativas
+    
+    # Configurações de timeout
+    timeout: 10s                            # Timeout para requisições HTTP
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES DE COLETA DE LOGS (SCRAPE CONFIGS)
+# -----------------------------------------------------------------------------
+scrape_configs:
+  
+  # ---------------------------------------------------------------------------
+  # JOB 1: LOGS DA APLICAÇÃO DE TESTE
+  # ---------------------------------------------------------------------------
+  - job_name: test-app
+    
+    # Configurações de descoberta de arquivos
+    static_configs:
+      - targets:
+          - localhost                       # Target local (não usado para file discovery)
+        labels:
+          job: test-app                     # Label identificando o job
+          host: test-app-server             # Label identificando o host
+          service: flask-app                # Label identificando o serviço
+          __path__: /app/logs/test-app.log  # Caminho do arquivo de log da aplicação
+    
+    # Pipeline de processamento dos logs da aplicação
+    pipeline_stages:
+      
+      # Estágio 1: Regex para extrair componentes do log
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<logger>\S+) - (?P<level>\S+) - (?P<message>.*)'
+          source: ""                        # Aplica regex na linha completa
+      
+      # Estágio 2: Adicionar labels baseados no conteúdo extraído
+      - labels:
+          level: level                      # Adiciona nível como label
+          logger: logger                    # Adiciona logger como label
+      
+      # Estágio 3: Parsing de timestamp
+      - timestamp:
+          source: timestamp                 # Campo de origem do timestamp
+          format: '2006-01-02 15:04:05,000' # Formato do timestamp Python
+      
+      # Estágio 4: Classificar por tipo de operação
+      - match:
+          selector: '{job="test-app"}'
+          stages:
+            - regex:
+                expression: '(?i)(background|generated|stress|forced)'
+                source: message
+            - labels:
+                operation_type: background  # Marca operações em background
+
+  # ---------------------------------------------------------------------------
+  # JOB 2: LOGS DO GERADOR ADICIONAL
+  # ---------------------------------------------------------------------------
+  - job_name: log-generator
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: log-generator
+          host: test-app-server
+          service: generator
+          __path__: /app/logs/generator.log
+    
+    # Pipeline similar ao da aplicação principal
+    pipeline_stages:
+      - regex:
+          expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) - (?P<logger>\S+) - (?P<level>\S+) - (?P<message>.*)'
+      - labels:
+          level: level
+          logger: logger
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02 15:04:05'
+
+  # ---------------------------------------------------------------------------
+  # JOB 3: LOGS DE ACESSO DO NGINX (FORMATO DETALHADO)
+  # ---------------------------------------------------------------------------
+  - job_name: nginx-access
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access
+          host: test-app-server
+          service: nginx
+          log_type: access
+          __path__: /var/log/nginx/access.log
+    
+    # Pipeline para parsing de logs de acesso do Nginx
+    pipeline_stages:
+      
+      # Parsing do formato de log detalhado do Nginx
+      - regex:
+          expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]*)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" (?P<request_time>\S+) (?P<upstream_response_time>\S+)'
+          source: ""
+      
+      # Adicionar labels baseados nos campos extraídos
+      - labels:
+          status_code: status
+          remote_addr: remote_addr
+          method: request
+      
+      # Parsing de timestamp do Nginx
+      - timestamp:
+          source: time_local
+          format: "02/Jan/2006:15:04:05 -0700"
+      
+      # Classificar por tipo de resposta HTTP
+      - match:
+          selector: '{job="nginx-access"}'
+          stages:
+            - regex:
+                expression: '^(?P<method>\w+)'
+                source: request
+            - labels:
+                http_method: method
+      
+      # Marcar erros HTTP (4xx e 5xx)
+      - match:
+          selector: '{job="nginx-access"}'
+          stages:
+            - regex:
+                expression: '^[45]\d{2}$'   # Status 4xx ou 5xx
+                source: status_code
+            - labels:
+                response_type: error        # Marca como erro
+
+  # ---------------------------------------------------------------------------
+  # JOB 4: LOGS DE ACESSO DO NGINX (FORMATO JSON)
+  # ---------------------------------------------------------------------------
+  - job_name: nginx-access-json
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-access-json
+          host: test-app-server
+          service: nginx
+          log_type: access-json
+          __path__: /var/log/nginx/access-json.log
+    
+    # Pipeline para parsing de logs JSON do Nginx
+    pipeline_stages:
+      
+      # Parsing do JSON
+      - json:
+          expressions:
+            timestamp: timestamp
+            remote_addr: remote_addr
+            request: request
+            status: status
+            request_time: request_time
+            upstream_response_time: upstream_response_time
+      
+      # Adicionar labels do JSON
+      - labels:
+          status_code: status
+          remote_addr: remote_addr
+      
+      # Parsing de timestamp ISO8601
+      - timestamp:
+          source: timestamp
+          format: RFC3339
+
+  # ---------------------------------------------------------------------------
+  # JOB 5: LOGS DE ERRO DO NGINX
+  # ---------------------------------------------------------------------------
+  - job_name: nginx-error
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx-error
+          host: test-app-server
+          service: nginx
+          log_type: error
+          __path__: /var/log/nginx/error.log
+    
+    # Pipeline para logs de erro do Nginx
+    pipeline_stages:
+      
+      # Parsing básico de logs de erro
+      - regex:
+          expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
+          source: ""
+      
+      # Adicionar nível como label
+      - labels:
+          level: level
+      
+      # Parsing de timestamp
+      - timestamp:
+          source: timestamp
+          format: '2006/01/02 15:04:05'
+
+  # ---------------------------------------------------------------------------
+  # JOB 6: LOGS DO SISTEMA (SYSLOG)
+  # ---------------------------------------------------------------------------
+  - job_name: syslog
+    
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: syslog
+          host: test-app-server
+          service: system
+          __path__: /var/log/syslog
+    
+    # Pipeline básico para syslog
+    pipeline_stages:
+      
+      # Parsing básico do syslog
+      - regex:
+          expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s*(?P<message>.*)'
+          source: ""
+      
+      # Adicionar labels
+      - labels:
+          hostname: hostname
+          syslog_service: service
+      
+      # Parsing de timestamp do syslog
+      - timestamp:
+          source: timestamp
+          format: 'Jan 02 15:04:05'
+          fallback_formats:
+            - "2006-01-02T15:04:05.000Z"
+            - "2006-01-02 15:04:05"
+
+# =============================================================================
+# INTEGRAÇÃO COM LOKI - INSTÂNCIA 2:
+# =============================================================================
+# 1. Este Promtail coleta logs de múltiplas fontes na instância de aplicação
+# 2. Logs são enviados para Loki na Instância 1
+# 3. Labels organizados por job, service, level, etc.
+# 4. Pipelines específicos para cada tipo de log
+#
+# CONSULTAS LOGQL RESULTANTES:
+# - {job="test-app"}: Logs da aplicação Flask
+# - {job="nginx-access"}: Logs de acesso do Nginx
+# - {job="nginx-error"}: Logs de erro do Nginx
+# - {job="log-generator"}: Logs do gerador adicional
+# - {job="syslog"}: Logs do sistema
+# - {level="error"}: Todos os logs de erro
+# - {service="nginx"}: Todos os logs do Nginx
+# =============================================================================
+#
+# CONFIGURAÇÃO NECESSÁRIA:
+# =============================================================================
+# 1. Substituir LOKI_SERVER_IP pelo IP privado da Instância 1
+# 2. Exemplo: sed -i 's/LOKI_SERVER_IP/10.0.1.100/' promtail-app-config.yml
+# 3. Reiniciar Promtail: docker-compose restart promtail
+# =============================================================================
