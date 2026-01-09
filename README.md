@@ -4,11 +4,13 @@ Este repositório contém os materiais da **Aula 02** do módulo **Monitoramento
 
 ## Conteúdo da Branch aula-02
 
-### 1. Script de User Data EC2 (`ec2-userdata-demo.sh`)
-Script automatizado para configuração de instâncias EC2 Ubuntu com:
-- Docker e Docker Compose
-- Code-server (VS Code no navegador) na porta 8080
-- Configurações básicas de segurança
+### 1. Scripts de User Data EC2
+- `ec2-userdata-instance-01.sh` - Script para Instância 1 (Prometheus Server)
+- `ec2-userdata-instance-02.sh` - Script para Instância 2 (Docker apenas)
+
+Scripts automatizados para configuração de instâncias EC2 Ubuntu:
+- **Instância 1**: Docker, Docker Compose e code-server
+- **Instância 2**: Docker apenas (exporters instalados manualmente)
 
 ### 2. Docker Compose Prometheus (`docker-compose.yml`)
 Stack do Prometheus para monitoramento moderno com:
@@ -19,12 +21,22 @@ Stack do Prometheus para monitoramento moderno com:
 - Node Exporter (instalação manual nas instâncias)
 - cAdvisor (instalação manual nas instâncias)
 
-## Arquivos de Documentação
+## Estrutura do Projeto
 
-- `ec2-userdata.md` - Guia detalhado do script de user data
-- `prometheus-compose.md` - Guia detalhado do Docker Compose Prometheus
-- `setup-ec2-instances.md` - Passo a passo completo para criar as instâncias EC2 com SSM
-- `exporters-installation.md` - Instalação manual do Node Exporter e cAdvisor
+```
+├── README.md                           # Documentação principal
+├── docker-compose.yml                 # Stack Prometheus + Alertmanager
+├── prometheus.yml                      # Configuração do Prometheus
+├── alertmanager.yml                    # Configuração do Alertmanager
+├── alert_rules.yml                     # Regras de alertas
+├── ec2-userdata-instance-01.sh         # Script para Instância 1 (Prometheus Server)
+├── ec2-userdata-instance-02.sh         # Script para Instância 2 (Docker apenas)
+└── docs/                               # Documentação detalhada
+    ├── setup-ec2-instances.md          # Guia de setup das instâncias
+    ├── exporters-installation.md       # Guia de instalação dos exporters
+    ├── prometheus-compose.md           # Guia do Docker Compose
+    └── ec2-userdata.md                 # Guia dos scripts de user data
+```
 
 ## Objetivo da Aula
 

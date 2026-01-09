@@ -84,7 +84,6 @@ aws iam add-role-to-instance-profile \
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
 - Custom TCP (8080) - Source: 0.0.0.0/0 (code-server)
-- HTTP (80) - Source: 0.0.0.0/0 (Prometheus web - se configurado)
 - Custom TCP (9090) - Source: 0.0.0.0/0 (Prometheus web)
 - Custom TCP (9093) - Source: 0.0.0.0/0 (Alertmanager web)
 
@@ -119,7 +118,7 @@ aws iam add-role-to-instance-profile \
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
-   - User data: Cole o conteúdo do `ec2-userdata-demo.sh`
+   - User data: Cole o conteúdo do `ec2-userdata-instance-01.sh`
 
 5. **Launch instance**
 
@@ -133,7 +132,7 @@ aws ec2 run-instances \
   --subnet-id subnet-xxxxxxxxx \
   --associate-public-ip-address \
   --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
-  --user-data file://ec2-userdata-demo.sh \
+  --user-data file://ec2-userdata-instance-01.sh \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=prometheus-server}]'
 ```
 
@@ -157,8 +156,9 @@ aws ec2 run-instances \
 
 4. **Advanced details:**
    - IAM instance profile: `PosTech-DevOps-Monitoramento-Profile`
+   - User data: Cole o conteúdo do `ec2-userdata-instance-02.sh`
 
-5. **Launch instance** (sem user data)
+5. **Launch instance**
 
 ### Via AWS CLI
 ```bash
@@ -170,6 +170,7 @@ aws ec2 run-instances \
   --subnet-id subnet-xxxxxxxxx \
   --associate-public-ip-address \
   --iam-instance-profile Name=PosTech-DevOps-Monitoramento-Profile \
+  --user-data file://ec2-userdata-instance-02.sh \
   --tag-specifications 'ResourceType=instance,Tags=[{Key=Name,Value=prometheus-exporters-host}]'
 ```
 
@@ -187,7 +188,7 @@ Os arquivos estarão disponíveis:
 - `prometheus.yml` - Configuração do Prometheus
 - `alertmanager.yml` - Configuração do Alertmanager
 - `alert_rules.yml` - Regras de alerta
-- `exporters-installation.md` - Guia de instalação dos exporters
+- `docs/exporters-installation.md` - Guia de instalação dos exporters
 
 ## Passo 6: Verificar Prometheus Server
 
@@ -229,7 +230,7 @@ aws ssm start-session --target i-0987654321fedcba0
 ```
 
 ### Instalar Node Exporter e cAdvisor
-Siga o guia detalhado em `exporters-installation.md` para:
+Siga o guia detalhado em `docs/exporters-installation.md` para:
 - Instalar Node Exporter (porta 9100)
 - Instalar cAdvisor (porta 8080)
 - Configurar como serviços systemd

@@ -21,7 +21,7 @@ Script de configuração automática para instâncias EC2 Ubuntu usado na Aula 0
 ### 1. No Console AWS
 1. Criar nova instância EC2 Ubuntu
 2. Em "Advanced Details" → "User data"
-3. Colar o conteúdo do arquivo `ec2-userdata-demo.sh`
+3. Colar o conteúdo do arquivo `ec2-userdata-instance-01.sh` (para Instância 1) ou `ec2-userdata-instance-02.sh` (para Instância 2)
 4. Finalizar criação da instância
 
 ### 2. Via AWS CLI
@@ -31,7 +31,9 @@ aws ec2 run-instances \
   --instance-type t3.micro \
   --key-name sua-chave \
   --security-group-ids sg-xxxxxxxxx \
-  --user-data file://ec2-userdata-demo.sh
+  --user-data file://ec2-userdata-instance-01.sh  # Para Instância 1
+  # OU
+  --user-data file://ec2-userdata-instance-02.sh  # Para Instância 2
 ```
 
 ### 3. Via Terraform
@@ -41,7 +43,9 @@ resource "aws_instance" "demo" {
   instance_type = "t3.micro"
   key_name      = "sua-chave"
   
-  user_data = file("${path.module}/ec2-userdata-demo.sh")
+  user_data = file("${path.module}/ec2-userdata-instance-01.sh")  # Para Instância 1
+  # OU
+  # user_data = file("${path.module}/ec2-userdata-instance-02.sh")  # Para Instância 2
 }
 ```
 
@@ -84,11 +88,15 @@ docker-compose --version
 
 ## Security Groups
 
+### Para Instância 1 (Prometheus Server)
 Certifique-se de que o Security Group permite:
 - **SSH (22)**: Para acesso via terminal
-- **HTTP (80)**: Para possível interface web adicional
 - **8080**: Para code-server
 - **9090**: Para interface web do Prometheus
 - **9093**: Para interface web do Alertmanager
-- **9100**: Para Node Exporter (entre instâncias)
-- **8080**: Para cAdvisor (entre instâncias) - mesma porta do code-server mas em instâncias diferentes
+
+### Para Instância 2 (Exporters)
+Certifique-se de que o Security Group permite:
+- **SSH (22)**: Para acesso via terminal
+- **9100**: Para Node Exporter (acesso do Prometheus)
+- **8080**: Para cAdvisor (acesso do Prometheus)
