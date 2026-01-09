@@ -28,7 +28,7 @@ groups:
           summary: "High CPU usage detected"   # Resumo do alerta
           description: "CPU usage is above 80% for more than 2 minutes on {{ $labels.instance }}"
           # Links para Grafana (ajustar IP_GRAFANA)
-          grafana_url: "http://IP_GRAFANA:3000/d/node-exporter/node-exporter?var-instance={{ $labels.instance }}"
+          grafana_url: "http://IP_GRAFANA:80/d/node-exporter/node-exporter?var-instance={{ $labels.instance }}"
           runbook_url: "https://wiki.company.com/runbooks/high-cpu"
       
       # -----------------------------------------------------------------------
@@ -46,7 +46,7 @@ groups:
           summary: "High memory usage detected" # Resumo do alerta
           description: "Memory usage is above 85% for more than 2 minutes on {{ $labels.instance }}"
           # Links para Grafana
-          grafana_url: "http://IP_GRAFANA:3000/d/node-exporter/node-exporter?var-instance={{ $labels.instance }}"
+          grafana_url: "http://IP_GRAFANA:80/d/node-exporter/node-exporter?var-instance={{ $labels.instance }}"
           runbook_url: "https://wiki.company.com/runbooks/high-memory"
       
       # -----------------------------------------------------------------------
@@ -64,7 +64,7 @@ groups:
           summary: "Low disk space"             # Resumo do alerta
           description: "Disk space is below 20% on {{ $labels.instance }}"
           # Links para Grafana
-          grafana_url: "http://IP_GRAFANA:3000/d/node-exporter/node-exporter?var-instance={{ $labels.instance }}"
+          grafana_url: "http://IP_GRAFANA:80/d/node-exporter/node-exporter?var-instance={{ $labels.instance }}"
           runbook_url: "https://wiki.company.com/runbooks/disk-space"
       
       # -----------------------------------------------------------------------
@@ -82,7 +82,7 @@ groups:
           summary: "Service is down"            # Resumo do alerta
           description: "{{ $labels.job }} service is down on {{ $labels.instance }}"
           # Links para Grafana
-          grafana_url: "http://IP_GRAFANA:3000/d/prometheus/prometheus-targets?var-job={{ $labels.job }}"
+          grafana_url: "http://IP_GRAFANA:80/d/prometheus/prometheus-targets?var-job={{ $labels.job }}"
           runbook_url: "https://wiki.company.com/runbooks/service-down"
 
 # =============================================================================

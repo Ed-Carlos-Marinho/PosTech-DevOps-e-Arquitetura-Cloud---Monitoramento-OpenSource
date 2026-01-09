@@ -87,5 +87,5 @@ scrape_configs:
 # 3. Para verificar a configuração:
 #    docker-compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
 # 4. Para ver targets ativos: http://IP_PROMETHEUS:9090/targets
-# 5. Para testar métricas no Grafana: http://IP_GRAFANA:3000
+# 5. Para testar métricas no Grafana: http://IP_GRAFANA:80
 # =============================================================================

@@ -5,11 +5,11 @@ Stack completa de monitoramento com Grafana, Prometheus, Alertmanager e Zabbix u
 ## Componentes da Stack
 
 ### Serviços Principais
-- **grafana**: Plataforma de visualização e dashboards (porta 3000)
+- **grafana**: Plataforma de visualização e dashboards (porta 80)
 - **prometheus**: Coleta de métricas modernas (porta 9090)
 - **alertmanager**: Gerenciamento de alertas (porta 9093)
 - **zabbix-server**: Monitoramento tradicional (porta 10051)
-- **zabbix-web**: Interface web do Zabbix (porta 8080)
+- **zabbix-web**: Interface web do Zabbix (porta 8081)
 - **zabbix-db**: MySQL para Zabbix
 - **zabbix-agent**: Agente local de monitoramento (porta 10050)
 
@@ -36,12 +36,12 @@ docker-compose logs -f
 ```
 
 ### 2. Acessar interfaces web
-- **Grafana**: `http://SEU_IP:3000`
+- **Grafana**: `http://SEU_IP:80`
   - Usuário: `admin`
   - Senha: `admin123`
 - **Prometheus**: `http://SEU_IP:9090`
 - **Alertmanager**: `http://SEU_IP:9093`
-- **Zabbix**: `http://SEU_IP:8080`
+- **Zabbix**: `http://SEU_IP:8081`
   - Usuário: `Admin`
   - Senha: `zabbix`
 
@@ -171,7 +171,7 @@ curl http://localhost:9090/api/v1/targets
 curl 'http://localhost:9090/api/v1/query?query=up'
 
 # Verificar hosts no Zabbix
-# Acessar http://localhost:8080 → Configuration → Hosts
+# Acessar http://localhost:8081 → Configuration → Hosts
 ```
 
 ### Performance e recursos
@@ -189,10 +189,10 @@ docker stats
 ## Security Groups AWS
 
 Para funcionar corretamente na AWS, libere as portas:
-- **3000**: Interface web do Grafana
+- **80**: Interface web do Grafana
 - **9090**: Interface web do Prometheus
 - **9093**: Interface web do Alertmanager
-- **8080**: Interface web do Zabbix
+- **8081**: Interface web do Zabbix
 - **10051**: Zabbix Server (para agentes)
 - **10050**: Zabbix Agent (do servidor para agentes)
 

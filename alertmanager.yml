@@ -39,7 +39,7 @@ receivers:
       - url: 'http://127.0.0.1:5001/'           # URL do webhook (ajustar conforme necessário)
         send_resolved: true                     # Envia notificação quando alerta é resolvido
         # Para integração com Grafana OnCall ou outras ferramentas:
-        # - url: 'http://grafana:3000/api/webhooks/alertmanager'
+        # - url: 'http://grafana:80/api/webhooks/alertmanager'
         # http_config:                          # Configurações HTTP adicionais (se necessário)
         #   basic_auth:
         #     username: 'webhook_user'
@@ -70,7 +70,7 @@ receivers:
           {{ end }}
           <hr>
           <p><em>Este alerta foi gerado automaticamente pelo sistema de monitoramento.</em></p>
-          <p><strong>Acesse o Grafana:</strong> <a href="http://IP_GRAFANA:3000">Dashboard de Monitoramento</a></p>
+          <p><strong>Acesse o Grafana:</strong> <a href="http://IP_GRAFANA:80">Dashboard de Monitoramento</a></p>
 
 # -----------------------------------------------------------------------------
 # REGRAS DE INIBIÇÃO

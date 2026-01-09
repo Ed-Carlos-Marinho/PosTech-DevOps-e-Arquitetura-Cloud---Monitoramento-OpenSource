@@ -141,9 +141,9 @@ docker-compose --version
 
 #### Acesso
 - **Code-server**: `http://IP_INSTANCIA_1:8080` (senha: demo123)
-- **Grafana**: `http://IP_INSTANCIA_1:3000` (admin/admin123) - após docker-compose up
+- **Grafana**: `http://IP_INSTANCIA_1:80` (admin/admin123) - após docker-compose up
 - **Prometheus**: `http://IP_INSTANCIA_1:9090` - após docker-compose up
-- **Zabbix**: `http://IP_INSTANCIA_1:8080` - após docker-compose up
+- **Zabbix**: `http://IP_INSTANCIA_1:8081` - após docker-compose up
 
 ### Instância 02 (Monitorada)
 
@@ -267,9 +267,9 @@ sudo ufw status
 ### Para Instância 01 (Monitoramento)
 Certifique-se de que o Security Group permite:
 - **SSH (22)**: Para acesso via terminal
-- **HTTP (80)**: Para Zabbix web interface  
+- **HTTP (80)**: Para Grafana web interface  
 - **8080**: Para code-server
-- **3000**: Para interface web do Grafana
+- **8081**: Para interface web do Zabbix
 - **9090**: Para interface web do Prometheus
 - **9093**: Para interface web do Alertmanager
 - **10051**: Para Zabbix Server (receber conexões de agentes)

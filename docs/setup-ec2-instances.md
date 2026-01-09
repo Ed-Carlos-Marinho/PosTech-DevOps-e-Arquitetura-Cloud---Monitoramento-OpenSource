@@ -90,11 +90,15 @@ aws iam add-role-to-instance-profile \
 
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
+- Custom TCP (80) - Source: 0.0.0.0/0 (Grafana web)
 - Custom TCP (8080) - Source: 0.0.0.0/0 (code-server)
-- Custom TCP (3000) - Source: 0.0.0.0/0 (Grafana web)
+- Custom TCP (8081) - Source: 0.0.0.0/0 (Zabbix web)
 - Custom TCP (9090) - Source: 0.0.0.0/0 (Prometheus web)
 - Custom TCP (9093) - Source: 0.0.0.0/0 (Alertmanager web)
+- Custom TCP (80) - Source: 0.0.0.0/0 (Grafana web)
+- Custom TCP (3000) - Source: 0.0.0.0/0 (Zabbix web)
 - Custom TCP (8080) - Source: 0.0.0.0/0 (Zabbix web)
+- Custom TCP (8081) - Source: 0.0.0.0/0 (code-server)
 - Custom TCP (10051) - Source: VPC CIDR (Zabbix server)
 
 ### Security Group para Exporters
@@ -226,10 +230,10 @@ docker-compose --version
 
 ### Acessar interfaces
 - **Code-server**: `http://IP_MONITORING_SERVER:8080` (senha: demo123)
-- **Grafana**: `http://IP_MONITORING_SERVER:3000` (admin/admin123)
+- **Grafana**: `http://IP_MONITORING_SERVER:80` (admin/admin123)
 - **Prometheus**: `http://IP_MONITORING_SERVER:9090`
 - **Alertmanager**: `http://IP_MONITORING_SERVER:9093`
-- **Zabbix**: `http://IP_MONITORING_SERVER:8080` (Admin/zabbix)
+- **Zabbix**: `http://IP_MONITORING_SERVER:8081` (Admin/zabbix)
 
 ## Passo 7: Verificar instância monitorada
 

@@ -32,9 +32,9 @@ Stack integrada de monitoramento com:
 
 ## Arquivos de Documentação
 
-- `ec2-userdata.md` - Guia detalhado dos scripts de user data
-- `grafana-compose.md` - Guia detalhado do Docker Compose com Grafana
-- `setup-ec2-instances.md` - Passo a passo completo para criar as instâncias EC2 com SSM
+- `docs/ec2-userdata.md` - Guia detalhado dos scripts de user data
+- `docs/grafana-compose.md` - Guia detalhado do Docker Compose com Grafana
+- `docs/setup-ec2-instances.md` - Passo a passo completo para criar as instâncias EC2 com SSM
 
 ## Objetivo da Aula
 
