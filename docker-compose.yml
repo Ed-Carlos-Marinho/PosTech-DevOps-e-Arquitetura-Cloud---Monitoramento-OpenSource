@@ -59,7 +59,8 @@ services:
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'       # Arquivo de configuração
       - '--storage.path=/alertmanager'                           # Caminho dos dados
-      - '--web.external-url=http://localhost:9093'               # URL externa (ajustar conforme necessário)
+      - '--web.external-url=http://0.0.0.0:9093'                # URL externa
+      - '--web.listen-address=0.0.0.0:9093'                     # Endereço de escuta
     
     networks:
       - monitoring
