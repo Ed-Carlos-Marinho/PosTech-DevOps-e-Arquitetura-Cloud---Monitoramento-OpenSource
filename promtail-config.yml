@@ -67,7 +67,6 @@ scrape_configs:
       # Parsing básico do syslog
       - regex:
           expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s*(?P<message>.*)'
-          source: ""
       
       # Adicionar labels
       - labels:

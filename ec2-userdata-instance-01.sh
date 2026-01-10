@@ -178,7 +178,7 @@ check_status "Inicialização do code-server"
 echo "🔥 Configurando firewall..."
 ufw --force enable                          # Habilita firewall (força sem prompt)
 ufw allow ssh                               # Permite SSH (porta 22)
-ufw allow 3000                              # Permite porta 3000 - para Grafana
+ufw allow http                              # Permite HTTP (porta 80) - para Grafana
 ufw allow 9090                              # Permite porta 9090 - para Prometheus
 ufw allow 3100                              # Permite porta 3100 - para Loki API
 ufw allow 8080                              # Permite porta 8080 - para code-server
@@ -209,7 +209,7 @@ echo "📊 PRÓXIMOS PASSOS PARA AULA 04:"
 echo "1. Clonar repositório: git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git"
 echo "2. Executar stack de observabilidade: docker-compose -f docker-compose-observability.yml up -d"
 echo "3. Acessar interfaces:"
-echo "   - Grafana: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000 (admin/admin123)"
+echo "   - Grafana: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):80 (admin/admin123)"
 echo "   - Prometheus: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9090"
 echo "   - Loki API: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3100"
 echo "   - Promtail Metrics: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9080/metrics"
@@ -222,7 +222,7 @@ echo "🔧 Sistema pronto para observabilidade completa com logs centralizados"
 # =============================================================================
 # 
 # STACK DE OBSERVABILIDADE COMPLETA:
-# - Grafana: Plataforma de visualização unificada (logs + métricas) (porta 3000)
+# - Grafana: Plataforma de visualização unificada (logs + métricas) (porta 80)
 # - Prometheus: Coleta de métricas modernas (porta 9090)
 # - Loki: Sistema de agregação de logs centralizados (porta 3100)
 # - Promtail: Agente de coleta de logs (métricas na porta 9080)
@@ -244,7 +244,7 @@ echo "🔧 Sistema pronto para observabilidade completa com logs centralizados"
 #
 # PORTAS UTILIZADAS:
 # - 22: SSH
-# - 3000: Grafana web interface
+# - 80: Grafana web interface
 # - 8080: Code-server
 # - 9090: Prometheus web interface
 # - 3100: Loki API (HTTP)

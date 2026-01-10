@@ -81,9 +81,9 @@ services:
     # Volumes para configuração e acesso aos logs
     volumes:
       - ./promtail-app-config.yml:/etc/promtail/config.yml  # Configuração do Promtail
-      - app-logs:/app/logs:ro                               # Logs da aplicação (somente leitura)
-      - nginx-logs:/var/log/nginx:ro                        # Logs do Nginx (somente leitura)
-      - /var/log:/var/log:ro                                # Logs do sistema (somente leitura)
+      - app-logs:/app/logs                                  # Logs da aplicação
+      - nginx-logs:/var/log/nginx                           # Logs do Nginx
+      - /var/log:/var/log                                   # Logs do sistema
       - promtail-positions:/tmp/positions                   # Posições de leitura dos arquivos
     
     # Parâmetros de inicialização do Promtail

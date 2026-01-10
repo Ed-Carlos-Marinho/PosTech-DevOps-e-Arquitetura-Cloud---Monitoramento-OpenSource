@@ -23,6 +23,11 @@ auth_enabled: false                         # Desabilita autenticação (HABILIT
 # CONFIGURAÇÕES DO INGESTER (Componente que recebe e processa logs)
 # -----------------------------------------------------------------------------
 ingester:
+  # Configurações do WAL (Write-Ahead Log)
+  wal:
+    enabled: true
+    dir: /loki/wal                           # Diretório do WAL dentro do volume montado
+    
   # Configurações do ciclo de vida dos chunks
   lifecycler:
     address: 127.0.0.1                      # Endereço do ingester
@@ -37,7 +42,6 @@ ingester:
   max_chunk_age: 1h                         # Idade máxima de um chunk
   chunk_target_size: 1048576                # Tamanho alvo do chunk (1MB)
   chunk_retain_period: 30s                  # Tempo de retenção do chunk na memória
-  max_transfer_retries: 0                   # Tentativas de transferência (0 = sem limite)
 
 # -----------------------------------------------------------------------------
 # CONFIGURAÇÕES DO SCHEMA (Estrutura de armazenamento)
@@ -61,7 +65,6 @@ storage_config:
     active_index_directory: /loki/boltdb-shipper-active    # Diretório de índices ativos
     cache_location: /loki/boltdb-shipper-cache             # Cache dos índices
     cache_ttl: 24h                                         # TTL do cache
-    shared_store: filesystem                               # Armazenamento compartilhado
   
   # Configurações do sistema de arquivos (armazenamento de chunks)
   filesystem:
@@ -72,13 +75,15 @@ storage_config:
 # -----------------------------------------------------------------------------
 compactor:
   working_directory: /loki/boltdb-shipper-compactor  # Diretório de trabalho do compactador
-  shared_store: filesystem                            # Armazenamento compartilhado
   compaction_interval: 10m                           # Intervalo de compactação
 
 # -----------------------------------------------------------------------------
 # CONFIGURAÇÕES DE LIMITES (Prevenção de sobrecarga)
 # -----------------------------------------------------------------------------
 limits_config:
+  # Desabilita structured metadata para compatibilidade com schema v11
+  allow_structured_metadata: false         # Desabilita structured metadata
+  
   # Limites de ingestão
   ingestion_rate_mb: 4                      # Taxa máxima de ingestão (4MB/s)
   ingestion_burst_size_mb: 6                # Tamanho máximo de burst (6MB)
@@ -98,8 +103,7 @@ limits_config:
 # -----------------------------------------------------------------------------
 # CONFIGURAÇÕES DE CHUNK STORE (Armazenamento de chunks)
 # -----------------------------------------------------------------------------
-chunk_store_config:
-  max_look_back_period: 0s                  # Período máximo de busca retroativa
+# chunk_store_config removido - não é mais necessário nas versões recentes
 
 # -----------------------------------------------------------------------------
 # CONFIGURAÇÕES DE TABLE MANAGER (Gerenciamento de tabelas)

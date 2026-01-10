@@ -90,7 +90,7 @@ aws iam add-role-to-instance-profile \
 **Regras de entrada:**
 - SSH (22) - Source: Seu IP
 - Custom TCP (8080) - Source: 0.0.0.0/0 (code-server)
-- Custom TCP (3000) - Source: 0.0.0.0/0 (Grafana web)
+- Custom TCP (80) - Source: 0.0.0.0/0 (Grafana web)
 - Custom TCP (3100) - Source: VPC CIDR (Loki API)
 - Custom TCP (9090) - Source: 0.0.0.0/0 (Prometheus web)
 
@@ -188,6 +188,7 @@ Após criar as duas instâncias, clone o repositório para ter acesso aos arquiv
 ```bash
 git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
 cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
+docker-compose -f docker-compose-observability.yml up -d
 ```
 
 Os arquivos estarão disponíveis:
@@ -223,7 +224,7 @@ docker-compose --version
 
 ### Acessar interfaces
 - **Code-server**: `http://IP_MONITORING_SERVER:8080` (senha: demo123)
-- **Grafana**: `http://IP_MONITORING_SERVER:3000` (admin/admin123)
+- **Grafana**: `http://IP_MONITORING_SERVER:80` (admin/admin123)
 - **Prometheus**: `http://IP_MONITORING_SERVER:9090`
 - **Loki**: `http://IP_MONITORING_SERVER:3100` (API - sem interface web)
 
