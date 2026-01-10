@@ -186,7 +186,7 @@ aws ec2 run-instances \
 Após criar as duas instâncias, clone o repositório para ter acesso aos arquivos necessários:
 
 ```bash
-git clone -b aula-03 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
+git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
 cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
 ```
 
@@ -246,11 +246,10 @@ sudo tail -f /var/log/user-data.log
 # Verificar aplicação de teste
 curl http://localhost/
 
-# Verificar cAdvisor
-# Verificar Promtail
+# Verificar Promtail metrics
 curl http://localhost:9080/metrics
 
-# Verificar aplicação de teste
+# Gerar logs de teste
 curl http://localhost/generate/10
 ```
 
@@ -291,8 +290,8 @@ docker-compose -f docker-compose-app.yml restart promtail
 - `{job="nginx-access"}` - Logs de acesso do Nginx
 - `{job="syslog"}` - Logs do sistema
 - `{level="error"}` - Todos os logs de erro
-- `{job="varlogs"} |= "error"` - Logs contendo "error"
-- `rate({job="varlogs"}[5m])` - Taxa de logs por segundo
+- `{job="test-app"} |= "error"` - Logs contendo "error"
+- `rate({job="test-app"}[5m])` - Taxa de logs por segundo
 
 ## Verificação final
 
@@ -308,24 +307,22 @@ docker-compose -f docker-compose-app.yml restart promtail
 
 ### Comandos úteis
 ```bash
-# Testar conectividade do Prometheus para exporters
-telnet IP_EXPORTERS_HOST 9100
-telnet IP_EXPORTERS_HOST 8080
+# Testar conectividade do Prometheus para Loki
+telnet IP_LOKI_HOST 3100
 
-# Testar conectividade do Loki para Promtail
-telnet IP_EXPORTERS_HOST 9080
+# Testar conectividade do Promtail para Loki
+telnet IP_LOKI_HOST 3100
 
-# Ver logs dos exporters
-sudo journalctl -u node_exporter -f
-sudo journalctl -u promtail -f
+# Ver logs dos serviços
+docker-compose -f docker-compose-observability.yml logs -f
+docker-compose -f docker-compose-app.yml logs -f
 
 # Testar métricas localmente
-curl http://localhost:9100/metrics
-curl http://localhost:8080/metrics
-curl http://localhost:9080/metrics
+curl http://localhost:9080/metrics  # Promtail metrics
+curl http://localhost:3100/metrics  # Loki metrics
 
 # Verificar configuração do Prometheus
-docker-compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+docker-compose -f docker-compose-observability.yml exec prometheus promtool check config /etc/prometheus/prometheus.yml
 
 # Verificar se Loki está recebendo logs
 curl http://localhost:3100/metrics | grep loki_ingester_streams
@@ -333,19 +330,19 @@ curl http://localhost:3100/metrics | grep loki_ingester_streams
 
 ## Troubleshooting
 
-### Exporters não conectam
-- Verificar Security Groups (portas 9100 e 8080)
-- Confirmar IPs privados no prometheus.yml
-- Verificar se serviços estão rodando: `systemctl status node_exporter cadvisor`
+### Promtail não conecta ao Loki
+- Verificar Security Groups (porta 3100 entre instâncias)
+- Confirmar IP privado da instância Loki no promtail-app-config.yml
+- Verificar se Loki está rodando: `docker-compose -f docker-compose-observability.yml ps`
 
 ### Prometheus não coleta métricas
 - Verificar logs: `docker-compose -f docker-compose-observability.yml logs prometheus`
 - Verificar targets em Status → Targets
-- Testar conectividade de rede entre instâncias
+- Testar conectividade de rede entre serviços
 
 ### Loki não recebe logs
 - Verificar logs: `docker-compose -f docker-compose-observability.yml logs loki`
-- Verificar se Promtail está conectado: `docker-compose -f docker-compose-observability.yml logs promtail`
+- Verificar se Promtail está conectado: `docker-compose -f docker-compose-app.yml logs promtail`
 - Testar API do Loki: `curl http://localhost:3100/ready`
 
 ### Logs não aparecem no Grafana
@@ -360,5 +357,5 @@ curl http://localhost:9080/metrics | grep promtail_sent_entries_total
 curl http://localhost:3100/metrics | grep loki_ingester_streams
 
 # Testar consulta LogQL simples no Grafana
-{job="varlogs"}
+{job="test-app"}
 ```
