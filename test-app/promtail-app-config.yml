@@ -68,7 +68,6 @@ scrape_configs:
       # Estágio 1: Regex para extrair componentes do log
       - regex:
           expression: '^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2},\d{3}) - (?P<logger>\S+) - (?P<level>\S+) - (?P<message>.*)'
-          source: ""                        # Aplica regex na linha completa
       
       # Estágio 2: Adicionar labels baseados no conteúdo extraído
       - labels:
@@ -136,7 +135,6 @@ scrape_configs:
       # Parsing do formato de log detalhado do Nginx
       - regex:
           expression: '^(?P<remote_addr>\S+) - (?P<remote_user>\S+) \[(?P<time_local>[^\]]+)\] "(?P<request>[^"]*)" (?P<status>\d+) (?P<body_bytes_sent>\d+) "(?P<http_referer>[^"]*)" "(?P<http_user_agent>[^"]*)" (?P<request_time>\S+) (?P<upstream_response_time>\S+)'
-          source: ""
       
       # Adicionar labels baseados nos campos extraídos
       - labels:
@@ -228,7 +226,6 @@ scrape_configs:
       # Parsing básico de logs de erro
       - regex:
           expression: '^(?P<timestamp>\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) \[(?P<level>\w+)\] (?P<message>.*)'
-          source: ""
       
       # Adicionar nível como label
       - labels:
@@ -259,7 +256,6 @@ scrape_configs:
       # Parsing básico do syslog
       - regex:
           expression: '^(?P<timestamp>\w+\s+\d+\s+\d+:\d+:\d+)\s+(?P<hostname>\S+)\s+(?P<service>\S+):\s*(?P<message>.*)'
-          source: ""
       
       # Adicionar labels
       - labels:

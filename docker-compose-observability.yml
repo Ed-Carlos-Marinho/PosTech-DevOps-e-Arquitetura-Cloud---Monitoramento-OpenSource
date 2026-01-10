@@ -94,13 +94,7 @@ services:
       - monitoring
     restart: unless-stopped
     
-    # Healthcheck para garantir que Loki está pronto
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3100/ready || exit 1"]
-      interval: 60s
-      timeout: 30s
-      retries: 5
-      start_period: 120s
+
 
   # ---------------------------------------------------------------------------
   # PROMTAIL - Agente de coleta de logs para Loki
@@ -120,17 +114,16 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro  # Logs dos containers
       - promtail-positions:/tmp/positions                # Posições de leitura dos arquivos
     
-    # Parâmetros de inicialização do Promtail
+    # Parâmetros de inicialização do Promtail com delay de 6 minutos
     command: -config.file=/etc/promtail/config.yml
     
     networks:
       - monitoring
     restart: unless-stopped
     
-    # Aguarda Loki estar saudável antes de iniciar
+    # Aguarda Loki estar rodando
     depends_on:
-      loki:
-        condition: service_healthy
+      - loki
 
 # -----------------------------------------------------------------------------
 # VOLUMES PERSISTENTES - Para manter dados entre reinicializações
