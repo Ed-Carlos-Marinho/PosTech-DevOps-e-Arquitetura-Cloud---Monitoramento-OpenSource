@@ -6,8 +6,6 @@
 # Foco: Aplicações distribuídas com instrumentação OpenTelemetry para Jaeger
 # =============================================================================
 
-version: '3.8'
-
 services:
   # ---------------------------------------------------------------------------
   # FRONTEND SERVICE - React/Node.js com instrumentação OpenTelemetry
@@ -56,7 +54,7 @@ services:
     
     # Porta interna
     ports:
-      - "5000:5000"
+      - "5001:5000"
     
     # Variáveis de ambiente
     environment:
@@ -190,10 +188,10 @@ services:
       - "5778:5778"       # HTTP endpoint para configuração
       - "14271:14271"     # Admin port
     
-    # Configuração do agente
-    command:
-      - "--reporter.grpc.host-port=JAEGER_COLLECTOR_IP:14250"
-      - "--log-level=debug"
+    # Configuração do agente - SUBSTITUIR JAEGER_COLLECTOR_HOST pelo IP da instância 1
+    environment:
+      - REPORTER_GRPC_HOST_PORT=${JAEGER_COLLECTOR_HOST:-localhost}:14250
+      - LOG_LEVEL=debug
     
     networks:
       - app-network

@@ -28,15 +28,11 @@ const config = {
   },
 };
 
-// Opções adicionais
+// Opções adicionais - removida configuração de métricas problemática
 const options = {
   tags: {
     'frontend-service.version': '1.0.0',
     'deployment.environment': process.env.NODE_ENV || 'development',
-  },
-  metrics: {
-    // Habilitar métricas do Jaeger
-    factory: jaeger.PrometheusMetricsFactory,
   },
   logger: {
     info: (msg) => console.log('JAEGER INFO:', msg),
@@ -44,22 +40,36 @@ const options = {
   },
 };
 
-// Inicializar o tracer
-const tracer = jaeger.initTracer(config, options);
-
-// Definir como tracer global do OpenTracing
-opentracing.initGlobalTracer(tracer);
-
-console.log('🔍 Jaeger tracing initialized for frontend-service');
-console.log(`📡 Agent: ${config.reporter.agentHost}:${config.reporter.agentPort}`);
-console.log(`🎯 Sampling: ${config.sampler.type} (${config.sampler.param})`);
+// Inicializar o tracer com tratamento de erro
+let tracer;
+try {
+  tracer = jaeger.initTracer(config, options);
+  
+  // Definir como tracer global do OpenTracing
+  opentracing.initGlobalTracer(tracer);
+  
+  console.log('🔍 Jaeger tracing initialized for frontend-service');
+  console.log(`📡 Agent: ${config.reporter.agentHost}:${config.reporter.agentPort}`);
+  console.log(`🎯 Sampling: ${config.sampler.type} (${config.sampler.param})`);
+} catch (error) {
+  console.error('❌ Failed to initialize Jaeger tracer:', error.message);
+  console.log('🔄 Continuing without tracing...');
+  
+  // Criar um tracer noop como fallback
+  tracer = new opentracing.Tracer();
+  opentracing.initGlobalTracer(tracer);
+}
 
 // Graceful shutdown
 process.on('SIGTERM', () => {
-  tracer.close(() => {
-    console.log('🔍 Jaeger tracer closed');
+  if (tracer && typeof tracer.close === 'function') {
+    tracer.close(() => {
+      console.log('🔍 Jaeger tracer closed');
+      process.exit(0);
+    });
+  } else {
     process.exit(0);
-  });
+  }
 });
 
 // Exportar tracer para uso na aplicação

@@ -15,23 +15,30 @@ def initialize_tracing():
     Inicializa a configuração de tracing Jaeger para o backend service
     """
     
+    # Obter configurações do ambiente
+    jaeger_host = os.getenv('JAEGER_AGENT_HOST', 'localhost')
+    jaeger_port = int(os.getenv('JAEGER_AGENT_PORT', '6832'))
+    sampler_type = os.getenv('JAEGER_SAMPLER_TYPE', 'const')
+    sampler_param = float(os.getenv('JAEGER_SAMPLER_PARAM', '1'))
+    service_name = os.getenv('JAEGER_SERVICE_NAME', 'backend-service')
+    
     # Configuração do Jaeger Client
     config = Config(
         config={
             'sampler': {
-                'type': os.getenv('JAEGER_SAMPLER_TYPE', 'const'),
-                'param': float(os.getenv('JAEGER_SAMPLER_PARAM', '1')),
+                'type': sampler_type,
+                'param': sampler_param,
             },
             'local_agent': {
-                'reporting_host': os.getenv('JAEGER_AGENT_HOST', 'localhost'),
-                'reporting_port': int(os.getenv('JAEGER_AGENT_PORT', '6832')),
+                'reporting_host': jaeger_host,
+                'reporting_port': jaeger_port,
             },
             'logging': True,
             'reporter_batch_size': 10,
             'reporter_queue_size': 100,
             'reporter_flush_interval': 1,
         },
-        service_name=os.getenv('JAEGER_SERVICE_NAME', 'backend-service'),
+        service_name=service_name,
         validate=True,
     )
     
@@ -42,8 +49,8 @@ def initialize_tracing():
     opentracing.set_global_tracer(tracer)
     
     print("🔍 Jaeger tracing initialized for backend-service")
-    print(f"📡 Agent: {config.local_agent['reporting_host']}:{config.local_agent['reporting_port']}")
-    print(f"🎯 Sampling: {config.sampler['type']} ({config.sampler['param']})")
+    print(f"📡 Agent: {jaeger_host}:{jaeger_port}")
+    print(f"🎯 Sampling: {sampler_type} ({sampler_param})")
     
     return tracer
 
