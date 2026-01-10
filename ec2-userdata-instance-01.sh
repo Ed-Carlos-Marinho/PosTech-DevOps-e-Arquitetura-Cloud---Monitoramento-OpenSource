@@ -1,15 +1,21 @@
 #!/bin/bash
 
 # =============================================================================
-# EC2 USER DATA SCRIPT - AUTOMATED SETUP
+# EC2 USER DATA SCRIPT - OBSERVABILITY INSTANCE
 # =============================================================================
 # Script de configuração automática para instâncias EC2 Ubuntu
-# Aula 01 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Aula 04 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
 # 
+# OBJETIVO DA AULA 04:
+# Implementar observabilidade completa com logs centralizados usando Loki,
+# correlação entre métricas e logs, e dashboards unificados no Grafana.
+#
 # Este script instala e configura automaticamente:
-# - Docker e Docker Compose
-# - Code-server (VS Code no navegador)
+# - Docker e Docker Compose (para stack de observabilidade)
+# - Code-server (VS Code no navegador) para desenvolvimento
+# - Stack Grafana + Prometheus + Loki + Promtail
 # - Configurações básicas de segurança
+# - Preparação para coleta de logs centralizados
 # =============================================================================
 
 # -----------------------------------------------------------------------------
@@ -76,7 +82,7 @@ check_status "Configuração do Docker"
 # =============================================================================
 
 echo "🐳 Instalando Docker Compose..."
-# Download da versão específica para arquitetura ARM64 (t4g.medium)
+# Download da versão específica para arquitetura ARM64 (t4g.small)
 curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose       # Torna executável
 check_status "Instalação do Docker Compose"
@@ -98,15 +104,26 @@ if [ ! -f /usr/bin/code-server ]; then
 fi
 
 # =============================================================================
-# FASE 6: CONFIGURAÇÃO DO CODE-SERVER
+# FASE 6: CRIAÇÃO DE USUÁRIO DEDICADO PARA CODE-SERVER
+# =============================================================================
+
+echo "👤 Criando usuário dedicado para code-server..."
+# Cria usuário específico para code-server com diretório home
+useradd -m -s /bin/bash -c "Code Server User" codeserver
+# Adiciona ao grupo docker para poder usar Docker se necessário
+usermod -a -G docker codeserver
+check_status "Criação do usuário codeserver"
+
+# =============================================================================
+# FASE 7: CONFIGURAÇÃO DO CODE-SERVER
 # =============================================================================
 
 echo "⚙️ Configurando code-server..."
-# Cria diretório de configuração para o usuário ubuntu
-mkdir -p /home/ubuntu/.config/code-server
+# Cria diretório de configuração para o usuário codeserver
+mkdir -p /home/codeserver/.config/code-server
 
 # Cria arquivo de configuração do code-server
-cat > /home/ubuntu/.config/code-server/config.yaml << 'EOF'
+cat > /home/codeserver/.config/code-server/config.yaml << 'EOF'
 bind-addr: 0.0.0.0:8080                     # Escuta em todas interfaces na porta 8080
 auth: password                              # Usa autenticação por senha
 password: demo123                           # Senha de acesso (ALTERAR EM PRODUÇÃO)
@@ -114,36 +131,38 @@ cert: false                                 # Desabilita HTTPS (usar proxy rever
 EOF
 
 # Define propriedade correta dos arquivos de configuração
-chown -R ubuntu:ubuntu /home/ubuntu/.config
+chown -R codeserver:codeserver /home/codeserver/.config
 check_status "Configuração do code-server"
 
 # =============================================================================
-# FASE 7: CRIAÇÃO DO SERVIÇO SYSTEMD
+# FASE 8: CRIAÇÃO DO SERVIÇO SYSTEMD
 # =============================================================================
 
 echo "🔧 Criando serviço systemd..."
 # Cria arquivo de serviço para gerenciar code-server via systemd
 cat > /etc/systemd/system/code-server.service << 'EOF'
 [Unit]
-Description=code-server                     # Descrição do serviço
-After=network.target                        # Inicia após rede estar disponível
+Description=Code Server - VS Code in Browser
+After=network.target
 
 [Service]
-Type=simple                                 # Tipo de serviço simples
-User=ubuntu                                 # Executa como usuário ubuntu
-Group=ubuntu                                # Executa como grupo ubuntu
-WorkingDirectory=/home/ubuntu               # Diretório de trabalho
-Environment=HOME=/home/ubuntu               # Define HOME para o usuário
-ExecStart=/usr/bin/code-server --config /home/ubuntu/.config/code-server/config.yaml
-Restart=always                             # Reinicia automaticamente se falhar
-RestartSec=10                               # Aguarda 10s antes de reiniciar
+Type=simple
+User=codeserver
+Group=codeserver
+WorkingDirectory=/home/codeserver
+Environment=HOME=/home/codeserver
+Environment=XDG_CONFIG_HOME=/home/codeserver/.config
+Environment=XDG_DATA_HOME=/home/codeserver/.local/share
+ExecStart=/usr/bin/code-server --config /home/codeserver/.config/code-server/config.yaml
+Restart=always
+RestartSec=10
 
 [Install]
-WantedBy=multi-user.target                  # Inicia no boot do sistema
+WantedBy=multi-user.target
 EOF
 
 # =============================================================================
-# FASE 8: INICIALIZAÇÃO DO CODE-SERVER
+# FASE 9: INICIALIZAÇÃO DO CODE-SERVER
 # =============================================================================
 
 echo "🚀 Iniciando code-server..."
@@ -153,18 +172,21 @@ systemctl start code-server                 # Inicia o serviço
 check_status "Inicialização do code-server"
 
 # =============================================================================
-# FASE 9: CONFIGURAÇÃO DO FIREWALL
+# FASE 10: CONFIGURAÇÃO DO FIREWALL
 # =============================================================================
 
 echo "🔥 Configurando firewall..."
 ufw --force enable                          # Habilita firewall (força sem prompt)
 ufw allow ssh                               # Permite SSH (porta 22)
-ufw allow http                              # Permite HTTP (porta 80) - para aplicações web
+ufw allow 3000                              # Permite porta 3000 - para Grafana
+ufw allow 9090                              # Permite porta 9090 - para Prometheus
+ufw allow 3100                              # Permite porta 3100 - para Loki API
 ufw allow 8080                              # Permite porta 8080 - para code-server
+ufw allow 9080                              # Permite porta 9080 - para Promtail metrics
 check_status "Configuração do firewall"
 
 # =============================================================================
-# FASE 10: VERIFICAÇÃO FINAL
+# FASE 11: VERIFICAÇÃO FINAL
 # =============================================================================
 
 echo "🔍 Verificando status dos serviços..."
@@ -177,41 +199,110 @@ systemctl is-active code-server && echo "✅ Code-server está rodando"
 # =============================================================================
 
 echo "=== ✅ Configuração concluída com sucesso em $(date) ==="
+echo ""
+echo "🎯 AULA 04 - STACK DE OBSERVABILIDADE PREPARADA"
+echo "=============================================="
 echo "🌐 Code-server disponível em: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
 echo "🔑 Senha: demo123"
+echo ""
+echo "📊 PRÓXIMOS PASSOS PARA AULA 04:"
+echo "1. Clonar repositório: git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git"
+echo "2. Executar stack de observabilidade: docker-compose -f docker-compose-observability.yml up -d"
+echo "3. Acessar interfaces:"
+echo "   - Grafana: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000 (admin/admin123)"
+echo "   - Prometheus: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9090"
+echo "   - Loki API: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3100"
+echo "   - Promtail Metrics: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9080/metrics"
+echo ""
 echo "🐳 Docker e Docker Compose instalados e configurados"
+echo "🔧 Sistema pronto para observabilidade completa com logs centralizados"
 
 # =============================================================================
-# INFORMAÇÕES IMPORTANTES PARA MANUTENÇÃO:
+# INFORMAÇÕES IMPORTANTES PARA AULA 04:
 # =============================================================================
 # 
+# STACK DE OBSERVABILIDADE COMPLETA:
+# - Grafana: Plataforma de visualização unificada (logs + métricas) (porta 3000)
+# - Prometheus: Coleta de métricas modernas (porta 9090)
+# - Loki: Sistema de agregação de logs centralizados (porta 3100)
+# - Promtail: Agente de coleta de logs (métricas na porta 9080)
+#
 # LOGS E TROUBLESHOOTING:
 # - Log de execução: /var/log/user-data.log
 # - Status do code-server: systemctl status code-server
 # - Logs do code-server: journalctl -u code-server -f
 # - Reiniciar code-server: systemctl restart code-server
+# - Logs da stack: docker-compose -f docker-compose-observability.yml logs -f
 #
 # ARQUIVOS DE CONFIGURAÇÃO:
-# - Code-server config: /home/ubuntu/.config/code-server/config.yaml
+# - Code-server config: /home/codeserver/.config/code-server/config.yaml (porta 8080)
 # - Serviço systemd: /etc/systemd/system/code-server.service
+# - Docker Compose: docker-compose-observability.yml
+# - Prometheus config: prometheus.yml
+# - Loki config: loki-config.yml
+# - Promtail config: promtail-config.yml
 #
 # PORTAS UTILIZADAS:
 # - 22: SSH
-# - 80: HTTP (aplicações web)
+# - 3000: Grafana web interface
 # - 8080: Code-server
-# - 3000: Grafana
-# - 3100: Loki API
-# - 9090: Prometheus
+# - 9090: Prometheus web interface
+# - 3100: Loki API (HTTP)
+# - 9096: Loki gRPC (interno)
+# - 9080: Promtail metrics endpoint
+#
+# INTEGRAÇÃO GRAFANA + PROMETHEUS + LOKI:
+# 1. Grafana como frontend unificado para logs e métricas
+# 2. Prometheus para métricas (próprio Prometheus, Promtail, Loki)
+# 3. Loki para logs centralizados (sistema, aplicações, containers)
+# 4. Promtail para coleta automática de logs
+# 5. Dashboards combinando logs e métricas com correlação temporal
+# 6. Consultas LogQL para análise de logs estruturados
+#
+# DATA SOURCES NO GRAFANA:
+# - Prometheus: http://prometheus:9090
+# - Loki: http://loki:3100
+#
+# DASHBOARDS RECOMENDADOS:
+# - Node Exporter Full (ID: 1860) - Para métricas do Prometheus
+# - Loki Stack Monitoring (ID: 14055) - Para monitoramento do Loki
+# - Promtail (ID: 15141) - Para monitoramento do Promtail
+# - Logs App (built-in do Grafana) - Para exploração de logs
+#
+# CONSULTAS LOGQL BÁSICAS:
+# - {job="syslog"}: Todos os logs do sistema
+# - {job="docker-observability"}: Logs dos containers
+# - {job="syslog"} |= "error": Logs contendo "error"
+# - rate({job="syslog"}[5m]): Taxa de logs por segundo
+# - {service="grafana"}: Logs específicos do Grafana
+#
+# CORRELAÇÃO LOGS + MÉTRICAS:
+# - Use split view no Grafana para correlacionar eventos
+# - Dashboards com painéis de logs e métricas sincronizados
+# - Alertas baseados em logs usando LogQL
+# - Análise de causa raiz combinando ambas as fontes
 #
 # SEGURANÇA EM PRODUÇÃO:
-# - Alterar senha padrão do code-server (demo123)
-# - Configurar HTTPS/SSL para code-server
+# - Alterar senhas padrão (code-server: demo123, Grafana: admin123)
+# - Configurar HTTPS/SSL para todas as interfaces web
 # - Restringir acesso por IP no Security Group
-# - Usar autenticação mais robusta (OAuth, etc.)
+# - Usar autenticação mais robusta (LDAP, OAuth, etc.)
+# - Configurar backup automático dos volumes Docker
+# - Habilitar auth_enabled no Loki para multi-tenancy
 #
-# CUSTOMIZAÇÕES POSSÍVEIS:
-# - Alterar porta do code-server (modificar config.yaml e firewall)
-# - Instalar extensões específicas do VS Code
-# - Configurar workspace padrão
-# - Adicionar usuários adicionais
+# MONITORAMENTO DA PRÓPRIA STACK:
+# - Métricas dos containers via cAdvisor
+# - Métricas do Prometheus via self-monitoring
+# - Métricas do Grafana via built-in metrics
+# - Métricas do Loki via /metrics endpoint
+# - Métricas do Promtail via porta 9080
+# - Alertas para serviços down, alto uso de recursos, etc.
+#
+# OTIMIZAÇÕES PARA PRODUÇÃO:
+# - Configurar retenção adequada no Loki (retention_period)
+# - Ajustar limites de ingestão conforme volume de logs
+# - Usar armazenamento distribuído (S3, GCS) para Loki
+# - Configurar compactação automática de dados antigos
+# - Implementar sharding para alta disponibilidade
+# - Monitorar performance das consultas LogQL
 # =============================================================================
