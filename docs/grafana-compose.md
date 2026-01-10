@@ -55,11 +55,14 @@ docker-compose logs -f
 5. **Save & Test**
 
 #### Zabbix Data Source
-1. **Configuration** → **Data Sources** → **Add data source**
-2. **Type**: Zabbix (instalar plugin se necessário)
-3. **URL**: `http://zabbix-web:8080/api_jsonrpc.php`
-4. **Username**: `Admin`
-5. **Password**: `zabbix`
+1. Acesse o Grafana: `http://seu-servidor:80`
+2. Login: `admin` / `admin123`
+3. Vá em: **Configuration** → **Data Sources** → **Add data source**
+4. Selecione: **Zabbix** (instalar plugin se necessário)
+5. Configure:
+   - **URL**: `http://zabbix-web:8080/api_jsonrpc.php`
+   - **Username**: `Admin` (usuário padrão do Zabbix)
+   - **Password**: `zabbix` (senha padrão do Zabbix)
 6. **Save & Test**
 
 #### Alertmanager Data Source

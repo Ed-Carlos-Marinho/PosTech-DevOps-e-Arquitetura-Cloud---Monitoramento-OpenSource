@@ -175,7 +175,7 @@ mkdir -p /var/log/zabbix
 mkdir -p /run/zabbix
 
 # Copiar binários
-cp bin/zabbix_agentd /usr/local/sbin/
+cp sbin/zabbix_agentd /usr/local/sbin/
 cp bin/zabbix_get /usr/local/bin/
 cp bin/zabbix_sender /usr/local/bin/
 
