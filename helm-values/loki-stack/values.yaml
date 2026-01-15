@@ -1,0 +1,148 @@
+# =============================================================================
+# LOKI VALUES
+# =============================================================================
+# Aula 07 - PosTech DevOps - Observabilidade no Kubernetes
+# Configuração para Loki (Agregação de Logs)
+# =============================================================================
+
+# =============================================================================
+# DEPLOYMENT MODE
+# =============================================================================
+deploymentMode: SingleBinary
+
+# =============================================================================
+# DISABLE OTHER COMPONENTS
+# =============================================================================
+read:
+  replicas: 0
+
+write:
+  replicas: 0
+
+backend:
+  replicas: 0
+
+# =============================================================================
+# DISABLE CACHES TO SAVE RESOURCES
+# =============================================================================
+chunksCache:
+  enabled: false
+
+resultsCache:
+  enabled: false
+
+# =============================================================================
+# LOKI CONFIGURATION
+# =============================================================================
+loki:
+  # Configuração de autenticação (desabilitada para lab)
+  auth_enabled: false
+  
+  # Configuração do servidor
+  server:
+    http_listen_port: 3100
+    grpc_listen_port: 9096
+  
+  # Configuração de storage
+  storage:
+    type: filesystem
+    filesystem:
+      chunks_directory: /var/loki/chunks
+      rules_directory: /var/loki/rules
+    bucketNames:
+      chunks: chunks
+      ruler: ruler
+      admin: admin
+  
+  # Configuração de schema
+  schemaConfig:
+    configs:
+      - from: 2024-04-01
+        store: tsdb
+        object_store: filesystem
+        schema: v13
+        index:
+          prefix: loki_index_
+          period: 24h
+  
+  # Configuração de limites
+  limits_config:
+    retention_period: 168h  # 7 days
+    ingestion_rate_mb: 4
+    ingestion_burst_size_mb: 8
+    max_concurrent_tail_requests: 5
+    max_cache_freshness_per_query: 10m
+  
+  # Configuração de compactação (desabilitada para evitar erro)
+  compactor:
+    working_directory: /var/loki/compactor
+    compaction_interval: 10m
+    retention_enabled: false
+
+# =============================================================================
+# SINGLE BINARY CONFIGURATION
+# =============================================================================
+singleBinary:
+  # Recursos computacionais muito reduzidos
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 25m
+    limits:
+      memory: 128Mi
+      cpu: 50m
+  
+  # Réplicas
+  replicas: 1
+  
+  # Storage persistente
+  persistence:
+    enabled: true
+    storageClass: gp2
+    size: 5Gi
+  
+  # Configurações de segurança
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    fsGroup: 10001
+
+# =============================================================================
+# SERVICE CONFIGURATION
+# =============================================================================
+gateway:
+  enabled: false
+
+# =============================================================================
+# MONITORING CONFIGURATION
+# =============================================================================
+monitoring:
+  serviceMonitor:
+    enabled: false
+  
+  selfMonitoring:
+    enabled: false
+    grafanaAgent:
+      installOperator: false
+
+# =============================================================================
+# TEST CONFIGURATION
+# =============================================================================
+test:
+  enabled: false
+
+# =============================================================================
+# CANARY CONFIGURATION
+# =============================================================================
+lokiCanary:
+  enabled: false
+
+# =============================================================================
+# ADDITIONAL CONFIGURATIONS
+# =============================================================================
+
+# Labels comuns
+commonLabels:
+  app.kubernetes.io/part-of: observability-stack
+  course: postech-devops
+  class: aula-07
