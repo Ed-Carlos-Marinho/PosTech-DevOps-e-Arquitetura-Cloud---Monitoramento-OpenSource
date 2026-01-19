@@ -1,216 +1,154 @@
 #!/bin/bash
 
 # =============================================================================
-# EC2 USER DATA SCRIPT - AUTOMATED SETUP
+# EC2 USER DATA SCRIPT - ZABBIX SERVER INSTANCE
 # =============================================================================
-# Script de configuração automática para instâncias EC2 Ubuntu
-# Aula 01 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
-# 
-# Este script instala e configura automaticamente:
-# - Docker e Docker Compose
-# - Code-server (VS Code no navegador)
-# - Configurações básicas de segurança
+# Aula 01 - PosTech DevOps - Monitoramento OpenSource
+# Stack: Zabbix Server + Code-server
 # =============================================================================
 
-# -----------------------------------------------------------------------------
-# CONFIGURAÇÕES DE AMBIENTE
-# -----------------------------------------------------------------------------
-# Define variáveis de ambiente essenciais para execução como root
+# Configurações de ambiente
 export HOME=/root
 export PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
-# -----------------------------------------------------------------------------
-# CONFIGURAÇÃO DE LOGS
-# -----------------------------------------------------------------------------
-# Redireciona toda saída (stdout e stderr) para arquivo de log
-# Permite acompanhar a execução via: sudo tail -f /var/log/user-data.log
+# Logs de execução
 exec > >(tee /var/log/user-data.log) 2>&1
 echo "=== Iniciando configuração da demo em $(date) ==="
 
-# -----------------------------------------------------------------------------
-# FUNÇÃO DE VERIFICAÇÃO DE STATUS
-# -----------------------------------------------------------------------------
-# Função utilitária para verificar se comandos foram executados com sucesso
-# Parâmetro: $1 = Descrição da operação para log
+# Função de verificação
 check_status() {
     if [ $? -eq 0 ]; then
         echo "✅ $1 - Sucesso"
     else
         echo "❌ $1 - Falhou"
-        exit 1                              # Para execução em caso de erro
+        exit 1
     fi
 }
 
-# =============================================================================
-# FASE 1: ATUALIZAÇÃO DO SISTEMA
-# =============================================================================
-
+# Atualização do sistema
 echo "📦 Atualizando sistema..."
-apt-get update -y                           # Atualiza lista de pacotes disponíveis
+apt-get update -y
 check_status "Atualização do sistema"
 
-# =============================================================================
-# FASE 2: INSTALAÇÃO DE PACOTES BÁSICOS
-# =============================================================================
-
+# Instalação de pacotes básicos
 echo "📦 Instalando pacotes básicos..."
-apt-get install -y git curl htop docker.io  # Instala ferramentas essenciais
-# git: Controle de versão
-# curl: Cliente HTTP para downloads
-# htop: Monitor de processos interativo
-# docker.io: Plataforma de containerização
+apt-get install -y git curl htop docker.io
 check_status "Instalação de pacotes básicos"
 
-# =============================================================================
-# FASE 3: CONFIGURAÇÃO DO DOCKER
-# =============================================================================
-
+# Configuração do Docker
 echo "🐳 Configurando Docker..."
-systemctl start docker                      # Inicia serviço do Docker
-systemctl enable docker                     # Habilita Docker para iniciar com o sistema
-usermod -a -G docker ubuntu                 # Adiciona usuário ubuntu ao grupo docker
+systemctl start docker
+systemctl enable docker
+usermod -a -G docker ubuntu
 check_status "Configuração do Docker"
 
-# =============================================================================
-# FASE 4: INSTALAÇÃO DO DOCKER COMPOSE
-# =============================================================================
-
+# Instalação do Docker Compose
 echo "🐳 Instalando Docker Compose..."
-# Download da versão específica para arquitetura ARM64 (t4g.small)
 curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
-chmod +x /usr/local/bin/docker-compose       # Torna executável
+chmod +x /usr/local/bin/docker-compose
 check_status "Instalação do Docker Compose"
 
-# =============================================================================
-# FASE 5: INSTALAÇÃO DO CODE-SERVER
-# =============================================================================
-
+# Instalação do Code-server
 echo "💻 Instalando code-server..."
-# Usa script oficial de instalação do code-server
 curl -fsSL https://code-server.dev/install.sh | sh
 check_status "Instalação do code-server"
 
-# Aguarda e verifica se instalação foi bem-sucedida
 sleep 3
 if [ ! -f /usr/bin/code-server ]; then
     echo "❌ Code-server não foi instalado corretamente"
     exit 1
 fi
 
-# =============================================================================
-# FASE 6: CONFIGURAÇÃO DO CODE-SERVER
-# =============================================================================
+# Criação de usuário para code-server
+echo "👤 Criando usuário dedicado para code-server..."
+useradd -m -s /bin/bash -c "Code Server User" codeserver
+usermod -a -G docker codeserver
+check_status "Criação do usuário codeserver"
 
+# Configuração do code-server
 echo "⚙️ Configurando code-server..."
-# Cria diretório de configuração para o usuário ubuntu
-mkdir -p /home/ubuntu/.config/code-server
+mkdir -p /home/codeserver/.config/code-server
 
-# Cria arquivo de configuração do code-server
-cat > /home/ubuntu/.config/code-server/config.yaml << 'EOF'
-bind-addr: 0.0.0.0:8080                     # Escuta em todas interfaces na porta 8080
-auth: password                              # Usa autenticação por senha
-password: demo123                           # Senha de acesso (ALTERAR EM PRODUÇÃO)
-cert: false                                 # Desabilita HTTPS (usar proxy reverso em produção)
+cat > /home/codeserver/.config/code-server/config.yaml << 'EOF'
+bind-addr: 0.0.0.0:8080
+auth: password
+password: demo123
+cert: false
 EOF
 
-# Define propriedade correta dos arquivos de configuração
-chown -R ubuntu:ubuntu /home/ubuntu/.config
+chown -R codeserver:codeserver /home/codeserver/.config
 check_status "Configuração do code-server"
 
-# =============================================================================
-# FASE 7: CRIAÇÃO DO SERVIÇO SYSTEMD
-# =============================================================================
-
+# Criação do serviço systemd
 echo "🔧 Criando serviço systemd..."
-# Cria arquivo de serviço para gerenciar code-server via systemd
 cat > /etc/systemd/system/code-server.service << 'EOF'
 [Unit]
-Description=code-server                     # Descrição do serviço
-After=network.target                        # Inicia após rede estar disponível
+Description=Code Server - VS Code in Browser
+After=network.target
 
 [Service]
-Type=simple                                 # Tipo de serviço simples
-User=ubuntu                                 # Executa como usuário ubuntu
-Group=ubuntu                                # Executa como grupo ubuntu
-WorkingDirectory=/home/ubuntu               # Diretório de trabalho
-Environment=HOME=/home/ubuntu               # Define HOME para o usuário
-ExecStart=/usr/bin/code-server --config /home/ubuntu/.config/code-server/config.yaml
-Restart=always                             # Reinicia automaticamente se falhar
-RestartSec=10                               # Aguarda 10s antes de reiniciar
+Type=simple
+User=codeserver
+Group=codeserver
+WorkingDirectory=/home/codeserver
+Environment=HOME=/home/codeserver
+Environment=XDG_CONFIG_HOME=/home/codeserver/.config
+Environment=XDG_DATA_HOME=/home/codeserver/.local/share
+ExecStart=/usr/bin/code-server --config /home/codeserver/.config/code-server/config.yaml
+Restart=always
+RestartSec=10
 
 [Install]
-WantedBy=multi-user.target                  # Inicia no boot do sistema
+WantedBy=multi-user.target
 EOF
 
-# =============================================================================
-# FASE 8: INICIALIZAÇÃO DO CODE-SERVER
-# =============================================================================
-
+# Inicialização do code-server
 echo "🚀 Iniciando code-server..."
-systemctl daemon-reload                     # Recarrega configurações do systemd
-systemctl enable code-server                # Habilita para iniciar com sistema
-systemctl start code-server                 # Inicia o serviço
+systemctl daemon-reload
+systemctl enable code-server
+systemctl start code-server
 check_status "Inicialização do code-server"
 
-# =============================================================================
-# FASE 9: CONFIGURAÇÃO DO FIREWALL
-# =============================================================================
-
+# Configuração do firewall
 echo "🔥 Configurando firewall..."
-ufw --force enable                          # Habilita firewall (força sem prompt)
-ufw allow ssh                               # Permite SSH (porta 22)
-ufw allow http                              # Permite HTTP (porta 80) - para Zabbix
-ufw allow 8080                              # Permite porta 8080 - para code-server
+ufw --force enable
+ufw allow ssh
+ufw allow 80                                # Zabbix Web Interface
+ufw allow 8080                              # Code-server
+ufw allow 10051                             # Zabbix Server
 check_status "Configuração do firewall"
 
-# =============================================================================
-# FASE 10: VERIFICAÇÃO FINAL
-# =============================================================================
-
+# Verificação final
 echo "🔍 Verificando status dos serviços..."
-# Verifica se serviços estão ativos e reporta status
 systemctl is-active docker && echo "✅ Docker está rodando"
 systemctl is-active code-server && echo "✅ Code-server está rodando"
 
-# =============================================================================
-# FINALIZAÇÃO E INFORMAÇÕES DE ACESSO
-# =============================================================================
-
+# Finalização
 echo "=== ✅ Configuração concluída com sucesso em $(date) ==="
+echo ""
+echo "🎯 AULA 01 - ZABBIX SERVER PREPARADO"
+echo "======================================================="
 echo "🌐 Code-server disponível em: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
 echo "🔑 Senha: demo123"
+echo ""
+echo "📊 PRÓXIMOS PASSOS PARA AULA 01:"
+echo "1. Clonar repositório: git clone -b aula-01 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git"
+echo "2. Executar Zabbix: docker-compose up -d"
+echo "3. Acessar Zabbix Web: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4) (Admin/zabbix)"
+echo ""
 echo "🐳 Docker e Docker Compose instalados e configurados"
+echo "🔧 Sistema pronto para Zabbix Server"
 
 # =============================================================================
-# INFORMAÇÕES IMPORTANTES PARA MANUTENÇÃO:
-# =============================================================================
+# INFORMAÇÕES IMPORTANTES:
 # 
-# LOGS E TROUBLESHOOTING:
-# - Log de execução: /var/log/user-data.log
-# - Status do code-server: systemctl status code-server
-# - Logs do code-server: journalctl -u code-server -f
-# - Reiniciar code-server: systemctl restart code-server
-#
-# ARQUIVOS DE CONFIGURAÇÃO:
-# - Code-server config: /home/ubuntu/.config/code-server/config.yaml
-# - Serviço systemd: /etc/systemd/system/code-server.service
-#
-# PORTAS UTILIZADAS:
-# - 22: SSH
-# - 80: HTTP (Zabbix web interface)
-# - 8080: Code-server
-# - 10050: Zabbix Agent (se configurado)
-# - 10051: Zabbix Server (se configurado)
-#
-# SEGURANÇA EM PRODUÇÃO:
-# - Alterar senha padrão do code-server (demo123)
-# - Configurar HTTPS/SSL para code-server
-# - Restringir acesso por IP no Security Group
-# - Usar autenticação mais robusta (OAuth, etc.)
-#
-# CUSTOMIZAÇÕES POSSÍVEIS:
-# - Alterar porta do code-server (modificar config.yaml e firewall)
-# - Instalar extensões específicas do VS Code
-# - Configurar workspace padrão
-# - Adicionar usuários adicionais
+# ZABBIX SERVER: http://IP (Admin/zabbix)
+# CODE-SERVER: http://IP:8080 (senha: demo123)
+# 
+# COMANDOS ÚTEIS:
+# - Logs: sudo tail -f /var/log/user-data.log
+# - Status: systemctl status code-server
+# - Docker: docker-compose ps
+# - Restart: systemctl restart code-server
+# - Zabbix logs: docker-compose logs -f zabbix-server
 # =============================================================================

@@ -19,9 +19,9 @@ Stack completa do Zabbix para monitoramento com:
 
 ## Arquivos de Documentação
 
-- `ec2-userdata.md` - Guia detalhado do script de user data
-- `zabbix-compose.md` - Guia detalhado do Docker Compose Zabbix
-- `setup-ec2-instances.md` - Passo a passo completo para criar as instâncias EC2 com SSM
+- `doc/ec2-userdata.md` - Guia detalhado do script de user data
+- `doc/zabbix-compose.md` - Guia detalhado do Docker Compose Zabbix
+- `doc/setup-ec2-instances.md` - Passo a passo completo para criar as instâncias EC2 com SSM
 
 ## Objetivo da Aula
 
