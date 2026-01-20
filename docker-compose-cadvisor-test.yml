@@ -1,0 +1,212 @@
+# =============================================================================
+# DOCKER COMPOSE - CADVISOR + APLICAÇÕES DE TESTE
+# =============================================================================
+# Este arquivo configura o cAdvisor para monitorar containers Docker
+# e sobe aplicações de teste para demonstração
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # CADVISOR - Monitor de Containers
+  # ---------------------------------------------------------------------------
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    
+    # Porta de acesso à interface web do cAdvisor
+    ports:
+      - "8080:8080"
+    
+    # Volumes necessários para monitorar o host e containers
+    volumes:
+      - /:/rootfs:ro                          # Sistema de arquivos raiz (read-only)
+      - /var/run:/var/run:ro                  # Docker socket e runtime
+      - /sys:/sys:ro                          # Informações do sistema
+      - /var/lib/docker/:/var/lib/docker:ro   # Dados dos containers
+      - /dev/disk/:/dev/disk:ro               # Informações de disco
+    
+    # Configurações de segurança
+    privileged: true                          # Necessário para acessar métricas do sistema
+    devices:
+      - /dev/kmsg                             # Acesso aos logs do kernel
+    
+    restart: unless-stopped
+    
+    networks:
+      - monitoring
+
+  # ---------------------------------------------------------------------------
+  # APLICAÇÃO 1: NGINX (Web Server)
+  # ---------------------------------------------------------------------------
+  nginx-app:
+    image: nginx:latest
+    container_name: nginx-test-app
+    
+    ports:
+      - "8081:80"
+    
+    # Configuração de recursos (para testar limites)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'           # Limite de 50% de 1 CPU
+          memory: 128M          # Limite de 128MB de RAM
+        reservations:
+          cpus: '0.25'          # Reserva mínima de 25% de 1 CPU
+          memory: 64M           # Reserva mínima de 64MB
+    
+    restart: unless-stopped
+    
+    networks:
+      - monitoring
+    
+    labels:
+      - "app.type=webserver"
+      - "app.name=nginx"
+      - "environment=test"
+
+  # ---------------------------------------------------------------------------
+  # APLICAÇÃO 2: REDIS (Cache/Database)
+  # ---------------------------------------------------------------------------
+  redis-app:
+    image: redis:alpine
+    container_name: redis-test-app
+    
+    ports:
+      - "6379:6379"
+    
+    # Configuração de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 64M
+        reservations:
+          cpus: '0.1'
+          memory: 32M
+    
+    restart: unless-stopped
+    
+    networks:
+      - monitoring
+    
+    labels:
+      - "app.type=database"
+      - "app.name=redis"
+      - "environment=test"
+
+  # ---------------------------------------------------------------------------
+  # APLICAÇÃO 3: STRESS TEST (Gerador de Carga)
+  # ---------------------------------------------------------------------------
+  # Aplicação que gera carga de CPU e memória para testes
+  stress-test:
+    image: polinux/stress
+    container_name: stress-test-app
+    
+    # Gera carga: 1 worker de CPU, 1 worker de memória (256MB), timeout de 1 hora
+    command: stress --cpu 1 --vm 1 --vm-bytes 256M --timeout 3600s
+    
+    # Configuração de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+    
+    restart: unless-stopped
+    
+    networks:
+      - monitoring
+    
+    labels:
+      - "app.type=stress-test"
+      - "app.name=stress"
+      - "environment=test"
+
+  # ---------------------------------------------------------------------------
+  # APLICAÇÃO 4: POSTGRES (Database)
+  # ---------------------------------------------------------------------------
+  postgres-app:
+    image: postgres:alpine
+    container_name: postgres-test-app
+    
+    ports:
+      - "5432:5432"
+    
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: testdb
+    
+    # Configuração de recursos
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+    
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    
+    restart: unless-stopped
+    
+    networks:
+      - monitoring
+    
+    labels:
+      - "app.type=database"
+      - "app.name=postgres"
+      - "environment=test"
+
+  # ---------------------------------------------------------------------------
+  # APLICAÇÃO 5: BUSYBOX (Container Leve para Testes)
+  # ---------------------------------------------------------------------------
+  busybox-app:
+    image: busybox:latest
+    container_name: busybox-test-app
+    
+    # Mantém o container rodando
+    command: sh -c "while true; do sleep 3600; done"
+    
+    # Configuração de recursos mínimos
+    deploy:
+      resources:
+        limits:
+          cpus: '0.1'
+          memory: 32M
+        reservations:
+          cpus: '0.05'
+          memory: 16M
+    
+    restart: unless-stopped
+    
+    networks:
+      - monitoring
+    
+    labels:
+      - "app.type=utility"
+      - "app.name=busybox"
+      - "environment=test"
+
+# -----------------------------------------------------------------------------
+# VOLUMES PERSISTENTES
+# -----------------------------------------------------------------------------
+volumes:
+  postgres-data:
+    driver: local
+
+# -----------------------------------------------------------------------------
+# REDES
+# -----------------------------------------------------------------------------
+networks:
+  monitoring:
+    driver: bridge
+

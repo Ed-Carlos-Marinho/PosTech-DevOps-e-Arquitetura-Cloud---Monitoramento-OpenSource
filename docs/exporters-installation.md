@@ -75,69 +75,96 @@ sudo netstat -tlnp | grep :9100
 - **Facilidade de gerenciamento**: Mais fácil de atualizar e configurar
 - **Padrão da indústria**: Forma recomendada pela comunidade
 - **Menos dependências**: Não precisa instalar binários no host
+- **Descoberta automática**: Monitora todos os containers automaticamente
 
-### Instalação via Docker Container
+### Instalação via Docker Compose
+
+Esta opção usa Docker Compose para gerenciar o cAdvisor e aplicações de teste.
+
+#### Passo 1: Clonar o repositório
 
 ```bash
-# Executar cAdvisor como container Docker
-docker run -d \
-  --name=cadvisor \
-  --restart=unless-stopped \
-  --volume=/:/rootfs:ro \
-  --volume=/var/run:/var/run:ro \
-  --volume=/sys:/sys:ro \
-  --volume=/var/lib/docker/:/var/lib/docker:ro \
-  --volume=/dev/disk/:/dev/disk:ro \
-  --publish=8080:8080 \
-  --privileged \
-  --device=/dev/kmsg \
-  gcr.io/cadvisor/cadvisor:latest
+# Conectar na instância via SSM ou SSH
+aws ssm start-session --target i-xxxxxxxxx
+
+# Clonar o repositório (ajuste a URL e branch conforme necessário)
+git clone https://github.com/seu-usuario/seu-repositorio.git
+cd seu-repositorio
+
+# Trocar para a branch correta (ajuste conforme necessário)
+git checkout main  # ou a branch que você está usando
 ```
 
-### Verificar funcionamento
+#### Passo 2: Subir o cAdvisor e aplicações de teste
 
 ```bash
-# Verificar se container está rodando
-docker ps | grep cadvisor
+# Subir todos os containers (cAdvisor + apps de teste)
+docker-compose -f docker-compose-cadvisor-test.yml up -d
 
-# Testar métricas localmente
+# Verificar se os containers estão rodando
+docker-compose -f docker-compose-cadvisor-test.yml ps
+
+# Ver logs do cAdvisor
+docker-compose -f docker-compose-cadvisor-test.yml logs -f cadvisor
+```
+
+#### Containers incluídos:
+
+- **cAdvisor** (porta 8080) - Monitor de containers
+- **NGINX** (porta 8081) - Web server de teste
+- **Redis** (porta 6379) - Cache/Database de teste
+- **Postgres** (porta 5432) - Database de teste
+- **Stress Test** - Gera carga de CPU/memória para testes
+- **Busybox** - Container leve para testes
+
+#### Verificar funcionamento
+
+```bash
+# Verificar containers rodando
+docker-compose -f docker-compose-cadvisor-test.yml ps
+
+# Testar métricas do cAdvisor
 curl http://localhost:8080/metrics
 
-# Verificar se está escutando na porta
-sudo netstat -tlnp | grep :8080
-
-# Ver logs do container
-docker logs cadvisor
-
-# Acessar interface web (opcional)
+# Acessar interface web do cAdvisor
 # http://IP_INSTANCIA:8080
+
+# Testar aplicações
+curl http://localhost:8081  # NGINX
 ```
 
-### Configurar para iniciar automaticamente
-
-O cAdvisor já está configurado com `--restart=unless-stopped`, mas se quiser garantir que inicie com o sistema:
+#### Gerenciar containers
 
 ```bash
-# Criar script de inicialização
-sudo tee /etc/systemd/system/cadvisor-docker.service > /dev/null << 'EOF'
-[Unit]
-Description=cAdvisor Docker Container
-Requires=docker.service
-After=docker.service
+# Parar todos os containers
+docker-compose -f docker-compose-cadvisor-test.yml stop
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/bin/docker start cadvisor
-ExecStop=/usr/bin/docker stop cadvisor
-TimeoutStartSec=0
+# Iniciar containers parados
+docker-compose -f docker-compose-cadvisor-test.yml start
 
-[Install]
-WantedBy=multi-user.target
-EOF
+# Reiniciar containers
+docker-compose -f docker-compose-cadvisor-test.yml restart
 
-# Habilitar serviço
-sudo systemctl enable cadvisor-docker
+# Ver logs de um container específico
+docker-compose -f docker-compose-cadvisor-test.yml logs -f nginx-app
+
+# Parar e remover tudo (incluindo volumes)
+docker-compose -f docker-compose-cadvisor-test.yml down -v
+```
+
+#### Testar alertas com Stress Test
+
+O container `stress-test` gera carga de CPU e memória, perfeito para testar alertas:
+
+```bash
+# Parar o stress test
+docker-compose -f docker-compose-cadvisor-test.yml stop stress-test
+
+# Iniciar o stress test novamente
+docker-compose -f docker-compose-cadvisor-test.yml start stress-test
+
+# Ver uso de recursos do stress test
+docker stats stress-test-app
 ```
 
 ## Configurar Security Groups
@@ -190,10 +217,15 @@ scrape_configs:
       - targets: ['10.0.1.100:8080', '10.0.1.101:8080']  # IPs privados das instâncias
 ```
 
-Recarregar configuração do Prometheus:
+Validar e recarregar configuração do Prometheus:
 ```bash
-# Dentro do container do Prometheus
+# Validar configuração
 docker-compose exec prometheus promtool check config /etc/prometheus/prometheus.yml
+
+# Recarregar via API (sem reiniciar)
+curl -X POST http://localhost:9090/-/reload
+
+# Ou reiniciar o container
 docker-compose restart prometheus
 ```
 
@@ -204,8 +236,40 @@ docker-compose restart prometheus
 3. Verificar se todos os exporters estão "UP"
 4. Testar consultas PromQL:
    - `up` - Status de todos os targets
-   - `node_cpu_seconds_total` - Métricas de CPU
-   - `container_memory_usage_bytes` - Métricas de containers
+   - `node_cpu_seconds_total` - Métricas de CPU do Node Exporter
+   - `container_memory_usage_bytes` - Métricas de containers do cAdvisor
+   - `container_last_seen{name!=""}` - Listar todos os containers descobertos
+   - `rate(container_cpu_usage_seconds_total{name!=""}[5m])` - CPU por container
+
+## Queries PromQL para Containers
+
+Com o cAdvisor rodando, você pode usar estas queries para monitorar containers:
+
+```promql
+# Listar todos os containers descobertos
+container_last_seen{name!=""}
+
+# CPU por container (em %)
+rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100
+
+# Memória usada por container
+container_memory_usage_bytes{name!=""}
+
+# Uso de memória vs limite (em %)
+(container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100
+
+# Top 5 containers por uso de CPU
+topk(5, rate(container_cpu_usage_seconds_total{name!=""}[5m]))
+
+# Top 5 containers por uso de memória
+topk(5, container_memory_usage_bytes{name!=""})
+
+# Tráfego de rede por container
+rate(container_network_receive_bytes_total{name!=""}[5m]) + rate(container_network_transmit_bytes_total{name!=""}[5m])
+
+# Containers específicos (ex: nginx)
+container_memory_usage_bytes{name="nginx-test-app"}
+```
 
 ## Troubleshooting
 
@@ -222,22 +286,49 @@ sudo -u node_exporter /usr/local/bin/node_exporter
 ```
 
 ### cAdvisor não inicia
+
 ```bash
-# Ver logs do container
-docker logs cadvisor
+# Ver logs do cAdvisor
+docker-compose -f docker-compose-cadvisor-test.yml logs cadvisor
+
+# Verificar status dos containers
+docker-compose -f docker-compose-cadvisor-test.yml ps
+
+# Reiniciar apenas o cAdvisor
+docker-compose -f docker-compose-cadvisor-test.yml restart cadvisor
+
+# Recriar o cAdvisor
+docker-compose -f docker-compose-cadvisor-test.yml up -d --force-recreate cadvisor
 
 # Verificar se Docker está rodando
 sudo systemctl status docker
+```
 
-# Verificar se container existe
-docker ps -a | grep cadvisor
+### Containers de teste não aparecem no cAdvisor
 
-# Reiniciar container
-docker restart cadvisor
+```bash
+# Verificar se os containers estão rodando
+docker ps
 
-# Remover e recriar container se necessário
-docker rm -f cadvisor
-# Depois executar novamente o comando docker run
+# Aguardar alguns segundos - cAdvisor descobre containers automaticamente
+# Atualizar a página do cAdvisor: http://IP:8080
+
+# Verificar métricas via curl
+curl http://localhost:8080/metrics | grep container_last_seen
+
+# Reiniciar o cAdvisor para forçar redescoberta
+docker-compose -f docker-compose-cadvisor-test.yml restart cadvisor
+```
+
+### Erro de permissão no cAdvisor
+
+```bash
+# Verificar se o cAdvisor está rodando com privilégios
+docker inspect cadvisor | grep -i privileged
+
+# Se necessário, recriar com --privileged
+docker-compose -f docker-compose-cadvisor-test.yml down
+docker-compose -f docker-compose-cadvisor-test.yml up -d
 ```
 
 ### Prometheus não consegue coletar métricas

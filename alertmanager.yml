@@ -12,6 +12,24 @@ global:
   # Configuração SMTP para envio de emails (ajustar conforme seu provedor)
   smtp_smarthost: 'localhost:587'              # Servidor SMTP
   smtp_from: 'alertmanager@example.com'        # Email remetente
+  
+  # smtp_auth_username: 'user@example.com'     # Usuário SMTP (se necessário)
+  # smtp_auth_password: 'password'             # Senha SMTP (se necessário)
+  # smtp_auth_identity: 'user@example.com'     # Identidade SMTP (opcional)
+  # smtp_auth_secret: 'secret'                 # Secret para autenticação (opcional)
+  # smtp_require_tls: true                     # Requer TLS (padrão: true)
+  
+  # resolve_timeout: 5m                        # Tempo para considerar alerta resolvido automaticamente
+  
+  # http_config:                               # Configuração HTTP global
+  #   proxy_url: 'http://proxy.example.com:8080'
+  #   tls_config:
+  #     insecure_skip_verify: false
+  
+  # slack_api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'  # Webhook global do Slack
+  # pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'            # URL do PagerDuty
+  # opsgenie_api_url: 'https://api.opsgenie.com/'                       # URL do OpsGenie
+  # victorops_api_url: 'https://alert.victorops.com/integrations/generic/20131114/alert/'
 
 # -----------------------------------------------------------------------------
 # ROTEAMENTO DE ALERTAS
@@ -22,6 +40,59 @@ route:
   group_interval: 10s               # Tempo entre envios de alertas do mesmo grupo
   repeat_interval: 1h               # Intervalo para reenvio de alertas não resolvidos
   receiver: 'web.hook'              # Receptor padrão para todos os alertas
+  
+  # # ROTAS FILHAS (Sub-rotas para roteamento específico)
+  # routes:
+  #   # Rota para alertas críticos - envia para PagerDuty
+  #   - match:
+  #       severity: critical
+  #     receiver: pagerduty-critical
+  #     group_wait: 10s
+  #     group_interval: 5m
+  #     repeat_interval: 12h
+  #     continue: false              # Para de processar outras rotas
+  #   
+  #   # Rota para alertas de banco de dados - envia para equipe de DB
+  #   - match_re:
+  #       alertname: ^(MySQL|Postgres|Redis).*
+  #     receiver: database-team
+  #     group_by: ['alertname', 'instance']
+  #     group_wait: 30s
+  #     group_interval: 5m
+  #     repeat_interval: 4h
+  #   
+  #   # Rota para alertas de infraestrutura - envia para Slack
+  #   - match:
+  #       job: node-exporter
+  #     receiver: slack-infra
+  #     group_by: ['alertname', 'instance']
+  #     group_wait: 30s
+  #     group_interval: 10m
+  #     repeat_interval: 3h
+  #   
+  #   # Rota para alertas de aplicação - envia para equipe de dev
+  #   - match:
+  #       team: backend
+  #     receiver: backend-team
+  #     group_by: ['alertname', 'service']
+  #     group_wait: 1m
+  #     group_interval: 10m
+  #     repeat_interval: 6h
+  #   
+  #   # Rota para alertas de warning - apenas email
+  #   - match:
+  #       severity: warning
+  #     receiver: email-warnings
+  #     group_wait: 5m
+  #     group_interval: 30m
+  #     repeat_interval: 24h
+  #   
+  #   # Rota com múltiplos matchers
+  #   - matchers:
+  #       - severity =~ "warning|critical"
+  #       - environment = "production"
+  #     receiver: prod-alerts
+  #     continue: true             # Continua processando outras rotas
 
 # -----------------------------------------------------------------------------
 # RECEPTORES DE ALERTAS
@@ -31,6 +102,198 @@ receivers:
   webhook_configs:
   - url: 'http://httpbin.org/post'  # URL de teste para desenvolvimento
     send_resolved: true             # Envia notificação quando alerta é resolvido
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: EMAIL
+# # ---------------------------------------------------------------------------
+# - name: 'email-warnings'
+#   email_configs:
+#   - to: 'team@example.com'
+#     from: 'alertmanager@example.com'
+#     smarthost: 'smtp.gmail.com:587'
+#     auth_username: 'alertmanager@example.com'
+#     auth_password: 'app-password'
+#     auth_identity: 'alertmanager@example.com'
+#     require_tls: true
+#     send_resolved: true
+#     headers:
+#       Subject: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+#     html: |
+#       <h2>Alert: {{ .GroupLabels.alertname }}</h2>
+#       <p><strong>Status:</strong> {{ .Status }}</p>
+#       {{ range .Alerts }}
+#       <p><strong>Instance:</strong> {{ .Labels.instance }}</p>
+#       <p><strong>Summary:</strong> {{ .Annotations.summary }}</p>
+#       <p><strong>Description:</strong> {{ .Annotations.description }}</p>
+#       <hr>
+#       {{ end }}
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: SLACK
+# # ---------------------------------------------------------------------------
+# - name: 'slack-infra'
+#   slack_configs:
+#   - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+#     channel: '#alerts-infra'
+#     username: 'Alertmanager'
+#     icon_emoji: ':warning:'
+#     send_resolved: true
+#     title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+#     text: |
+#       {{ range .Alerts }}
+#       *Instance:* {{ .Labels.instance }}
+#       *Summary:* {{ .Annotations.summary }}
+#       *Description:* {{ .Annotations.description }}
+#       {{ end }}
+#     color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+#     actions:
+#     - type: button
+#       text: 'View in Prometheus'
+#       url: 'http://prometheus.example.com:9090/alerts'
+#     - type: button
+#       text: 'Silence Alert'
+#       url: 'http://alertmanager.example.com:9093/#/silences/new'
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: PAGERDUTY
+# # ---------------------------------------------------------------------------
+# - name: 'pagerduty-critical'
+#   pagerduty_configs:
+#   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+#     routing_key: 'YOUR_ROUTING_KEY'
+#     url: 'https://events.pagerduty.com/v2/enqueue'
+#     send_resolved: true
+#     description: '{{ .GroupLabels.alertname }}: {{ .Annotations.summary }}'
+#     severity: '{{ if eq .Labels.severity "critical" }}critical{{ else }}error{{ end }}'
+#     details:
+#       firing: '{{ .Alerts.Firing | len }}'
+#       resolved: '{{ .Alerts.Resolved | len }}'
+#       instance: '{{ .GroupLabels.instance }}'
+#     client: 'Prometheus Alertmanager'
+#     client_url: 'http://alertmanager.example.com:9093'
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: OPSGENIE
+# # ---------------------------------------------------------------------------
+# - name: 'opsgenie-oncall'
+#   opsgenie_configs:
+#   - api_key: 'YOUR_OPSGENIE_API_KEY'
+#     api_url: 'https://api.opsgenie.com/'
+#     send_resolved: true
+#     message: '{{ .GroupLabels.alertname }}'
+#     description: '{{ .Annotations.description }}'
+#     priority: '{{ if eq .Labels.severity "critical" }}P1{{ else }}P3{{ end }}'
+#     tags: 'prometheus,{{ .Labels.severity }},{{ .Labels.job }}'
+#     responders:
+#     - name: 'DevOps Team'
+#       type: 'team'
+#     - name: 'On-Call Engineer'
+#       type: 'schedule'
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: VICTOROPS
+# # ---------------------------------------------------------------------------
+# - name: 'victorops-team'
+#   victorops_configs:
+#   - api_key: 'YOUR_VICTOROPS_API_KEY'
+#     routing_key: 'YOUR_ROUTING_KEY'
+#     api_url: 'https://alert.victorops.com/integrations/generic/20131114/alert/'
+#     send_resolved: true
+#     message_type: '{{ if eq .Status "firing" }}CRITICAL{{ else }}RECOVERY{{ end }}'
+#     entity_display_name: '{{ .GroupLabels.alertname }}'
+#     state_message: '{{ .Annotations.description }}'
+#     monitoring_tool: 'Prometheus'
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: WEBHOOK CUSTOMIZADO
+# # ---------------------------------------------------------------------------
+# - name: 'custom-webhook'
+#   webhook_configs:
+#   - url: 'https://your-webhook-endpoint.com/alerts'
+#     send_resolved: true
+#     http_config:
+#       basic_auth:
+#         username: 'webhook-user'
+#         password: 'webhook-password'
+#       tls_config:
+#         insecure_skip_verify: false
+#     max_alerts: 0  # 0 = sem limite
+#     # Payload customizado (opcional)
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: PUSHOVER (Notificações mobile)
+# # ---------------------------------------------------------------------------
+# - name: 'pushover-mobile'
+#   pushover_configs:
+#   - user_key: 'YOUR_PUSHOVER_USER_KEY'
+#     token: 'YOUR_PUSHOVER_APP_TOKEN'
+#     send_resolved: true
+#     title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+#     message: '{{ .Annotations.description }}'
+#     priority: '{{ if eq .Labels.severity "critical" }}1{{ else }}0{{ end }}'
+#     url: 'http://prometheus.example.com:9090/alerts'
+#     url_title: 'View in Prometheus'
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: TELEGRAM
+# # ---------------------------------------------------------------------------
+# - name: 'telegram-alerts'
+#   telegram_configs:
+#   - bot_token: 'YOUR_TELEGRAM_BOT_TOKEN'
+#     chat_id: YOUR_CHAT_ID
+#     send_resolved: true
+#     api_url: 'https://api.telegram.org'
+#     message: |
+#       🚨 *{{ .Status | toUpper }}*
+#       *Alert:* {{ .GroupLabels.alertname }}
+#       {{ range .Alerts }}
+#       *Instance:* {{ .Labels.instance }}
+#       *Summary:* {{ .Annotations.summary }}
+#       *Description:* {{ .Annotations.description }}
+#       {{ end }}
+#     parse_mode: 'Markdown'
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: DISCORD
+# # ---------------------------------------------------------------------------
+# - name: 'discord-alerts'
+#   discord_configs:
+#   - webhook_url: 'https://discord.com/api/webhooks/YOUR/WEBHOOK/URL'
+#     send_resolved: true
+#     title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+#     message: |
+#       {{ range .Alerts }}
+#       **Instance:** {{ .Labels.instance }}
+#       **Summary:** {{ .Annotations.summary }}
+#       **Description:** {{ .Annotations.description }}
+#       {{ end }}
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: MICROSOFT TEAMS
+# # ---------------------------------------------------------------------------
+# - name: 'teams-alerts'
+#   msteams_configs:
+#   - webhook_url: 'https://outlook.office.com/webhook/YOUR/WEBHOOK/URL'
+#     send_resolved: true
+#     title: '[{{ .Status | toUpper }}] {{ .GroupLabels.alertname }}'
+#     text: |
+#       {{ range .Alerts }}
+#       **Instance:** {{ .Labels.instance }}
+#       **Summary:** {{ .Annotations.summary }}
+#       **Description:** {{ .Annotations.description }}
+#       {{ end }}
+
+# # ---------------------------------------------------------------------------
+# # RECEPTOR: MÚLTIPLOS CANAIS
+# # ---------------------------------------------------------------------------
+# - name: 'multi-channel'
+#   email_configs:
+#   - to: 'team@example.com'
+#   slack_configs:
+#   - api_url: 'https://hooks.slack.com/services/YOUR/WEBHOOK/URL'
+#     channel: '#alerts'
+#   pagerduty_configs:
+#   - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
 
 # -----------------------------------------------------------------------------
 # REGRAS DE INIBIÇÃO
@@ -42,6 +305,65 @@ inhibit_rules:
   target_match:
     severity: 'warning'             # ...inibe alertas de warning...
   equal: ['alertname', 'instance'] # ...para a mesma instância e alerta
+
+# # Inibe alertas de disco quando instância está down
+# - source_match:
+#     alertname: 'ServiceDown'
+#   target_match_re:
+#     alertname: '^(DiskSpace|HighDiskUsage).*'
+#   equal: ['instance']
+
+# # Inibe alertas de aplicação quando há problema de rede
+# - source_match:
+#     alertname: 'NetworkDown'
+#   target_match_re:
+#     alertname: '^(HighLatency|ServiceSlow).*'
+#   equal: ['instance']
+
+# # Inibe warnings quando há alertas críticos do mesmo tipo
+# - source_matchers:
+#     - severity = "critical"
+#     - alertname =~ ".*CPU.*"
+#   target_matchers:
+#     - severity = "warning"
+#     - alertname =~ ".*CPU.*"
+#   equal: ['instance']
+
+# # Inibe alertas de container quando o host está down
+# - source_match:
+#     alertname: 'HostDown'
+#   target_match:
+#     job: 'cadvisor'
+#   equal: ['instance']
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÃO DE SILENCIAMENTO (via API ou UI)
+# -----------------------------------------------------------------------------
+# Silenciamentos podem ser criados via:
+# 1. Interface Web: http://alertmanager:9093/#/silences
+# 2. API: POST http://alertmanager:9093/api/v2/silences
+# 3. amtool: amtool silence add alertname=HighCPU instance=server1
+
+# -----------------------------------------------------------------------------
+# TEMPLATES CUSTOMIZADOS
+# -----------------------------------------------------------------------------
+# templates:
+#   - '/etc/alertmanager/templates/*.tmpl'
+#
+# Exemplo de template customizado (criar arquivo .tmpl):
+# {{ define "slack.default.title" }}
+# [{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .GroupLabels.alertname }}
+# {{ end }}
+#
+# {{ define "slack.default.text" }}
+# {{ range .Alerts }}
+# *Alert:* {{ .Labels.alertname }}
+# *Severity:* {{ .Labels.severity }}
+# *Instance:* {{ .Labels.instance }}
+# *Summary:* {{ .Annotations.summary }}
+# *Description:* {{ .Annotations.description }}
+# {{ end }}
+# {{ end }}
 
 # =============================================================================
 # INSTRUÇÕES DE CONFIGURAÇÃO:
@@ -59,4 +381,80 @@ inhibit_rules:
 #
 # 4. Para recarregar configuração:
 #    docker-compose restart alertmanager
+#
+# 5. Para validar configuração:
+#    docker-compose exec alertmanager amtool check-config /etc/alertmanager/alertmanager.yml
+#
+# 6. Para testar envio de alerta:
+#    amtool alert add alertname=TestAlert severity=warning instance=test
+#
+# =============================================================================
+# VARIÁVEIS DE TEMPLATE DISPONÍVEIS:
+# =============================================================================
+# .Status           - Status do alerta (firing ou resolved)
+# .GroupLabels      - Labels usados para agrupar alertas
+# .CommonLabels     - Labels comuns a todos os alertas do grupo
+# .CommonAnnotations - Annotations comuns a todos os alertas
+# .ExternalURL      - URL externa do Alertmanager
+# .Alerts           - Lista de todos os alertas
+# .Alerts.Firing    - Lista de alertas ativos
+# .Alerts.Resolved  - Lista de alertas resolvidos
+#
+# Para cada alerta (.Alerts):
+# .Labels           - Todos os labels do alerta
+# .Annotations      - Todas as annotations do alerta
+# .StartsAt         - Timestamp de início
+# .EndsAt           - Timestamp de fim
+# .GeneratorURL     - URL do Prometheus que gerou o alerta
+#
+# =============================================================================
+# FUNÇÕES DE TEMPLATE ÚTEIS:
+# =============================================================================
+# {{ .Status | toUpper }}                    - Converte para maiúsculas
+# {{ .Alerts.Firing | len }}                 - Conta alertas ativos
+# {{ $value | humanize }}                    - Formata valores
+# {{ if eq .Status "firing" }}...{{ end }}   - Condicional
+# {{ range .Alerts }}...{{ end }}            - Loop sobre alertas
+#
+# =============================================================================
+# EXEMPLOS DE CONFIGURAÇÃO SMTP:
+# =============================================================================
+#
+# Gmail:
+#   smtp_smarthost: 'smtp.gmail.com:587'
+#   smtp_auth_username: 'your-email@gmail.com'
+#   smtp_auth_password: 'app-password'  # Usar App Password, não senha normal
+#   smtp_require_tls: true
+#
+# AWS SES:
+#   smtp_smarthost: 'email-smtp.us-east-1.amazonaws.com:587'
+#   smtp_auth_username: 'YOUR_SMTP_USERNAME'
+#   smtp_auth_password: 'YOUR_SMTP_PASSWORD'
+#   smtp_require_tls: true
+#
+# SendGrid:
+#   smtp_smarthost: 'smtp.sendgrid.net:587'
+#   smtp_auth_username: 'apikey'
+#   smtp_auth_password: 'YOUR_SENDGRID_API_KEY'
+#   smtp_require_tls: true
+#
+# Mailgun:
+#   smtp_smarthost: 'smtp.mailgun.org:587'
+#   smtp_auth_username: 'postmaster@your-domain.mailgun.org'
+#   smtp_auth_password: 'YOUR_MAILGUN_PASSWORD'
+#   smtp_require_tls: true
+#
+# =============================================================================
+# BOAS PRÁTICAS:
+# =============================================================================
+# 1. Use group_by para agrupar alertas relacionados
+# 2. Configure repeat_interval adequadamente para evitar spam
+# 3. Use inhibit_rules para evitar alertas redundantes
+# 4. Configure send_resolved: true para notificar quando alertas são resolvidos
+# 5. Use rotas específicas para diferentes severidades
+# 6. Teste configurações antes de aplicar em produção
+# 7. Use templates customizados para mensagens mais informativas
+# 8. Configure múltiplos receivers para redundância
+# 9. Use silenciamentos durante manutenções programadas
+# 10. Monitore o próprio Alertmanager
 # =============================================================================

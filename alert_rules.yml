@@ -63,6 +63,456 @@ groups:
         annotations:
           summary: "Service is down"            # Resumo do alerta
           description: "{{ $labels.job }} service is down on {{ $labels.instance }}"
+  
+  # ---------------------------------------------------------------------------
+  # GRUPO: ALERTAS DE CONTAINERS (CADVISOR)
+  # ---------------------------------------------------------------------------
+  - name: container_alerts
+    rules:
+      
+      # -----------------------------------------------------------------------
+      # ALERTA: CONTAINER COM CPU ALTA
+      # -----------------------------------------------------------------------
+      - alert: ContainerHighCPU
+        # Expressão PromQL: CPU do container > 50% por mais de 2 minutos
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 50
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} with high CPU usage"
+          description: "Container {{ $labels.name }} on {{ $labels.instance }} is using {{ $value | humanize }}% CPU for more than 2 minutes"
+      
+      # -----------------------------------------------------------------------
+      # ALERTA: CONTAINER COM CPU CRÍTICA
+      # -----------------------------------------------------------------------
+      - alert: ContainerCriticalCPU
+        # Expressão PromQL: CPU do container > 80% por mais de 5 minutos
+        expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} with critical CPU usage"
+          description: "Container {{ $labels.name }} on {{ $labels.instance }} is using {{ $value | humanize }}% CPU for more than 5 minutes"
+      
+      # -----------------------------------------------------------------------
+      # ALERTA: CONTAINER COM MEMÓRIA ALTA
+      # -----------------------------------------------------------------------
+      - alert: ContainerHighMemory
+        # Expressão PromQL: Memória do container > 80% do limite
+        expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Container {{ $labels.name }} with high memory usage"
+          description: "Container {{ $labels.name }} is using {{ $value | humanize }}% of memory limit"
+      
+      # -----------------------------------------------------------------------
+      # ALERTA: CONTAINER PARADO/DOWN
+      # -----------------------------------------------------------------------
+      - alert: ContainerDown
+        # Expressão PromQL: Container não visto há mais de 60 segundos
+        expr: time() - container_last_seen{name!=""} > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} is down"
+          description: "Container {{ $labels.name }} on {{ $labels.instance }} has been down for more than 1 minute"
+      
+      # -----------------------------------------------------------------------
+      # ALERTA: STRESS TEST COM CPU ALTA (Para testes)
+      # -----------------------------------------------------------------------
+      - alert: StressTestHighCPU
+        # Expressão PromQL: CPU do stress-test > 30%
+        expr: rate(container_cpu_usage_seconds_total{name="stress-test-app"}[5m]) * 100 > 30
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "Stress test container is generating load"
+          description: "Stress test container is using {{ $value | humanize }}% CPU - This is expected behavior for testing"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: USO CRÍTICO DE CPU
+      # # ---------------------------------------------------------------------
+      # - alert: CriticalCPUUsage
+      #   expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+      #   for: 5m
+      #   labels:
+      #     severity: critical
+      #   annotations:
+      #     summary: "Critical CPU usage detected"
+      #     description: "CPU usage is above 95% for more than 5 minutes on {{ $labels.instance }}"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: ESPAÇO EM DISCO CRÍTICO
+      # # ---------------------------------------------------------------------
+      # - alert: DiskSpaceCritical
+      #   expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+      #   for: 1m
+      #   labels:
+      #     severity: critical
+      #   annotations:
+      #     summary: "Critical disk space"
+      #     description: "Disk space is below 10% on {{ $labels.instance }} ({{ $value | humanize }}% remaining)"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: ALTO USO DE INODES
+      # # ---------------------------------------------------------------------
+      # - alert: HighInodeUsage
+      #   expr: (node_filesystem_files_free{mountpoint="/"} / node_filesystem_files{mountpoint="/"}) * 100 < 20
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High inode usage"
+      #     description: "Inode usage is above 80% on {{ $labels.instance }}"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: ALTO LOAD AVERAGE
+      # # ---------------------------------------------------------------------
+      # - alert: HighLoadAverage
+      #   expr: node_load15 / count(node_cpu_seconds_total{mode="idle"}) without(cpu, mode) > 1.5
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High load average"
+      #     description: "Load average (15m) is {{ $value }} on {{ $labels.instance }}"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: MUITOS PROCESSOS ZUMBIS
+      # # ---------------------------------------------------------------------
+      # - alert: TooManyZombieProcesses
+      #   expr: node_processes_state{state="zombie"} > 5
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "Too many zombie processes"
+      #     description: "{{ $value }} zombie processes detected on {{ $labels.instance }}"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: SWAP USAGE ALTO
+      # # ---------------------------------------------------------------------
+      # - alert: HighSwapUsage
+      #   expr: (node_memory_SwapTotal_bytes - node_memory_SwapFree_bytes) / node_memory_SwapTotal_bytes * 100 > 50
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High swap usage"
+      #     description: "Swap usage is {{ $value | humanize }}% on {{ $labels.instance }}"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: ALTO TRÁFEGO DE REDE (RECEBIDO)
+      # # ---------------------------------------------------------------------
+      # - alert: HighNetworkReceive
+      #   expr: rate(node_network_receive_bytes_total{device!="lo"}[5m]) > 100000000  # 100 MB/s
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High network receive traffic"
+      #     description: "Network receive is {{ $value | humanize }}B/s on {{ $labels.instance }} ({{ $labels.device }})"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: ALTO TRÁFEGO DE REDE (TRANSMITIDO)
+      # # ---------------------------------------------------------------------
+      # - alert: HighNetworkTransmit
+      #   expr: rate(node_network_transmit_bytes_total{device!="lo"}[5m]) > 100000000  # 100 MB/s
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High network transmit traffic"
+      #     description: "Network transmit is {{ $value | humanize }}B/s on {{ $labels.instance }} ({{ $labels.device }})"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: ERROS DE REDE
+      # # ---------------------------------------------------------------------
+      # - alert: NetworkErrors
+      #   expr: rate(node_network_receive_errs_total[5m]) > 10 or rate(node_network_transmit_errs_total[5m]) > 10
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "Network errors detected"
+      #     description: "Network errors on {{ $labels.instance }} ({{ $labels.device }})"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: DISCO COM ALTA LATÊNCIA DE LEITURA
+      # # ---------------------------------------------------------------------
+      # - alert: HighDiskReadLatency
+      #   expr: rate(node_disk_read_time_seconds_total[5m]) / rate(node_disk_reads_completed_total[5m]) > 0.1
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High disk read latency"
+      #     description: "Disk read latency is {{ $value }}s on {{ $labels.instance }} ({{ $labels.device }})"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: DISCO COM ALTA LATÊNCIA DE ESCRITA
+      # # ---------------------------------------------------------------------
+      # - alert: HighDiskWriteLatency
+      #   expr: rate(node_disk_write_time_seconds_total[5m]) / rate(node_disk_writes_completed_total[5m]) > 0.1
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High disk write latency"
+      #     description: "Disk write latency is {{ $value }}s on {{ $labels.instance }} ({{ $labels.device }})"
+      
+      # # ---------------------------------------------------------------------
+      # # ALERTA: CLOCK SKEW (Diferença de tempo entre servidores)
+      # # ---------------------------------------------------------------------
+      # - alert: ClockSkew
+      #   expr: abs(node_timex_offset_seconds) > 0.05
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "Clock skew detected"
+      #     description: "Clock skew is {{ $value }}s on {{ $labels.instance }}"
+  
+  # ---------------------------------------------------------------------------
+  # GRUPO: ALERTAS DE CONTAINERS (CADVISOR)
+  # ---------------------------------------------------------------------------
+  # - name: container_alerts
+  #   rules:
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: CONTAINER COM USO ALTO DE CPU
+  #     # ---------------------------------------------------------------------
+  #     - alert: ContainerHighCPU
+  #       expr: rate(container_cpu_usage_seconds_total{name!=""}[5m]) * 100 > 80
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Container high CPU usage"
+  #         description: "Container {{ $labels.name }} CPU usage is {{ $value | humanize }}%"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: CONTAINER COM USO ALTO DE MEMÓRIA
+  #     # ---------------------------------------------------------------------
+  #     - alert: ContainerHighMemory
+  #       expr: (container_memory_usage_bytes{name!=""} / container_spec_memory_limit_bytes{name!=""}) * 100 > 80
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Container high memory usage"
+  #         description: "Container {{ $labels.name }} memory usage is {{ $value | humanize }}%"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: CONTAINER REINICIANDO FREQUENTEMENTE
+  #     # ---------------------------------------------------------------------
+  #     - alert: ContainerRestarting
+  #       expr: rate(container_last_seen{name!=""}[5m]) > 0
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Container restarting"
+  #         description: "Container {{ $labels.name }} is restarting frequently"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: CONTAINER PARADO
+  #     # ---------------------------------------------------------------------
+  #     - alert: ContainerStopped
+  #       expr: time() - container_last_seen{name!=""} > 60
+  #       for: 1m
+  #       labels:
+  #         severity: critical
+  #       annotations:
+  #         summary: "Container stopped"
+  #         description: "Container {{ $labels.name }} has been stopped"
+  
+  # ---------------------------------------------------------------------------
+  # GRUPO: ALERTAS DE APLICAÇÃO/HTTP
+  # ---------------------------------------------------------------------------
+  # - name: application_alerts
+  #   rules:
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: ALTA TAXA DE ERROS HTTP 5xx
+  #     # ---------------------------------------------------------------------
+  #     - alert: HighHTTP5xxRate
+  #       expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+  #       for: 5m
+  #       labels:
+  #         severity: critical
+  #       annotations:
+  #         summary: "High HTTP 5xx error rate"
+  #         description: "HTTP 5xx error rate is {{ $value }} on {{ $labels.instance }}"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: ALTA TAXA DE ERROS HTTP 4xx
+  #     # ---------------------------------------------------------------------
+  #     - alert: HighHTTP4xxRate
+  #       expr: rate(http_requests_total{status=~"4.."}[5m]) > 0.1
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "High HTTP 4xx error rate"
+  #         description: "HTTP 4xx error rate is {{ $value }} on {{ $labels.instance }}"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: ALTA LATÊNCIA DE RESPOSTA
+  #     # ---------------------------------------------------------------------
+  #     - alert: HighResponseLatency
+  #       expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 1
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "High response latency"
+  #         description: "95th percentile latency is {{ $value }}s on {{ $labels.instance }}"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: BAIXA TAXA DE REQUISIÇÕES (Possível problema)
+  #     # ---------------------------------------------------------------------
+  #     - alert: LowRequestRate
+  #       expr: rate(http_requests_total[5m]) < 1
+  #       for: 10m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Low request rate"
+  #         description: "Request rate is {{ $value }} req/s on {{ $labels.instance }}"
+  
+  # ---------------------------------------------------------------------------
+  # GRUPO: ALERTAS DE BANCO DE DADOS
+  # ---------------------------------------------------------------------------
+  # - name: database_alerts
+  #   rules:
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: MUITAS CONEXÕES ABERTAS
+  #     # ---------------------------------------------------------------------
+  #     - alert: TooManyDatabaseConnections
+  #       expr: mysql_global_status_threads_connected / mysql_global_variables_max_connections * 100 > 80
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Too many database connections"
+  #         description: "Database connections are at {{ $value | humanize }}% on {{ $labels.instance }}"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: QUERIES LENTAS
+  #     # ---------------------------------------------------------------------
+  #     - alert: SlowQueries
+  #       expr: rate(mysql_global_status_slow_queries[5m]) > 0.1
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Slow queries detected"
+  #         description: "Slow query rate is {{ $value }} on {{ $labels.instance }}"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: REPLICAÇÃO ATRASADA
+  #     # ---------------------------------------------------------------------
+  #     - alert: ReplicationLag
+  #       expr: mysql_slave_status_seconds_behind_master > 30
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Database replication lag"
+  #         description: "Replication lag is {{ $value }}s on {{ $labels.instance }}"
+  
+  # ---------------------------------------------------------------------------
+  # GRUPO: ALERTAS DE PROMETHEUS
+  # ---------------------------------------------------------------------------
+  # - name: prometheus_alerts
+  #   rules:
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: PROMETHEUS USANDO MUITA MEMÓRIA
+  #     # ---------------------------------------------------------------------
+  #     - alert: PrometheusHighMemory
+  #       expr: process_resident_memory_bytes{job="prometheus"} > 2000000000  # 2GB
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Prometheus high memory usage"
+  #         description: "Prometheus is using {{ $value | humanize }}B of memory"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: PROMETHEUS COM MUITOS TARGETS DOWN
+  #     # ---------------------------------------------------------------------
+  #     - alert: PrometheusTargetsDown
+  #       expr: count(up == 0) > 3
+  #       for: 5m
+  #       labels:
+  #         severity: critical
+  #       annotations:
+  #         summary: "Multiple Prometheus targets down"
+  #         description: "{{ $value }} targets are down"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: PROMETHEUS COM ATRASO NA INGESTÃO
+  #     # ---------------------------------------------------------------------
+  #     - alert: PrometheusIngestionDelay
+  #       expr: prometheus_tsdb_head_max_time - prometheus_tsdb_head_min_time > 3600
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Prometheus ingestion delay"
+  #         description: "Prometheus ingestion delay is {{ $value }}s"
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # ALERTA: PROMETHEUS COM MUITAS SÉRIES TEMPORAIS
+  #     # ---------------------------------------------------------------------
+  #     - alert: PrometheusTooManyTimeSeries
+  #       expr: prometheus_tsdb_head_series > 1000000
+  #       for: 5m
+  #       labels:
+  #         severity: warning
+  #       annotations:
+  #         summary: "Prometheus has too many time series"
+  #         description: "Prometheus has {{ $value }} time series"
+  
+  # ---------------------------------------------------------------------------
+  # GRUPO: RECORDING RULES (Pré-computar queries complexas)
+  # ---------------------------------------------------------------------------
+  # - name: recording_rules
+  #   interval: 30s  # Intervalo de avaliação específico para este grupo
+  #   rules:
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # RECORDING RULE: CPU USAGE POR INSTÂNCIA
+  #     # ---------------------------------------------------------------------
+  #     - record: instance:node_cpu_utilization:rate5m
+  #       expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # RECORDING RULE: MEMORY USAGE POR INSTÂNCIA
+  #     # ---------------------------------------------------------------------
+  #     - record: instance:node_memory_utilization:ratio
+  #       expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # RECORDING RULE: DISK USAGE POR INSTÂNCIA
+  #     # ---------------------------------------------------------------------
+  #     - record: instance:node_disk_utilization:ratio
+  #       expr: (node_filesystem_size_bytes{mountpoint="/"} - node_filesystem_avail_bytes{mountpoint="/"}) / node_filesystem_size_bytes{mountpoint="/"}
+  #     
+  #     # ---------------------------------------------------------------------
+  #     # RECORDING RULE: NETWORK TRAFFIC TOTAL
+  #     # ---------------------------------------------------------------------
+  #     - record: instance:node_network_traffic:rate5m
+  #       expr: rate(node_network_receive_bytes_total{device!="lo"}[5m]) + rate(node_network_transmit_bytes_total{device!="lo"}[5m])
 
 # =============================================================================
 # EXPLICAÇÃO DAS EXPRESSÕES PROMQL:
@@ -89,9 +539,42 @@ groups:
 # =============================================================================
 # NÍVEIS DE SEVERIDADE:
 # =============================================================================
+# - info: Informações gerais, não requer ação imediata
 # - warning: Situações que precisam de atenção mas não são críticas
 # - critical: Situações que requerem ação imediata
-# - info: Informações gerais (não usado neste exemplo)
+# =============================================================================
+#
+# FUNÇÕES PROMQL ÚTEIS:
+# =============================================================================
+# - rate(): Taxa de mudança por segundo (para counters)
+# - irate(): Taxa instantânea (mais sensível a mudanças rápidas)
+# - increase(): Aumento total no intervalo de tempo
+# - avg(): Média dos valores
+# - sum(): Soma dos valores
+# - min()/max(): Valores mínimo/máximo
+# - count(): Conta o número de séries temporais
+# - histogram_quantile(): Calcula percentis de histogramas
+# - abs(): Valor absoluto
+# - time(): Timestamp Unix atual
+# - humanize: Formata valores para leitura humana (usado em annotations)
+# =============================================================================
+#
+# OPERADORES DE COMPARAÇÃO:
+# =============================================================================
+# - >  : Maior que
+# - <  : Menor que
+# - >= : Maior ou igual
+# - <= : Menor ou igual
+# - == : Igual
+# - != : Diferente
+# - =~ : Regex match
+# - !~ : Regex não match
+# =============================================================================
+#
+# AGREGADORES:
+# =============================================================================
+# - by(label): Agrupa por labels específicos
+# - without(label): Agrupa removendo labels específicos
 # =============================================================================
 #
 # PERSONALIZAÇÃO:
@@ -101,4 +584,19 @@ groups:
 # - Memory: Altere "> 85" para o valor desejado  
 # - Disk: Altere "< 20" para o valor desejado
 # - Timing: Altere "for: 2m" para a duração desejada
+#
+# Para habilitar regras comentadas:
+# 1. Remova o "#" no início de cada linha da regra
+# 2. Ajuste os valores conforme necessário
+# 3. Recarregue o Prometheus: curl -X POST http://localhost:9090/-/reload
+# =============================================================================
+#
+# TEMPLATES DE ANNOTATIONS:
+# =============================================================================
+# Variáveis disponíveis em annotations:
+# - {{ $labels.label_name }}: Valor de um label específico
+# - {{ $value }}: Valor atual da expressão
+# - {{ $value | humanize }}: Valor formatado para leitura humana
+# - {{ $labels.instance }}: Instância que disparou o alerta
+# - {{ $labels.job }}: Job que disparou o alerta
 # =============================================================================

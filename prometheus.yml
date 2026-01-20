@@ -11,12 +11,23 @@
 global:
   scrape_interval: 15s      # Intervalo padrão para coleta de métricas (15 segundos)
   evaluation_interval: 15s  # Intervalo para avaliação de regras de alerta (15 segundos)
+  
+  # scrape_timeout: 10s     # Timeout para cada scrape (padrão: 10s)
+  
+  # external_labels:        # Labels adicionados a todas as métricas e alertas
+  #   cluster: 'production'
+  #   region: 'us-east-1'
+  #   environment: 'prod'
+  
+  # query_log_file: /var/log/prometheus/query.log  # Log de queries executadas
 
 # -----------------------------------------------------------------------------
 # ARQUIVOS DE REGRAS DE ALERTA
 # -----------------------------------------------------------------------------
 rule_files:
   - "alert_rules.yml"       # Arquivo contendo as regras de alerta personalizadas
+  # - "recording_rules.yml" # Regras de gravação para pré-computar queries complexas
+  # - "alerts/*.yml"        # Carregar todos os arquivos .yml de um diretório
 
 # -----------------------------------------------------------------------------
 # CONFIGURAÇÃO DO ALERTMANAGER
@@ -26,6 +37,13 @@ alerting:
     - static_configs:
         - targets:
           - alertmanager:9093   # Endereço do Alertmanager (nome do container Docker)
+    
+    # alert_relabel_configs:  # Reescrever labels antes de enviar ao Alertmanager
+    #   - source_labels: [dc]
+    #     target_label: datacenter
+    
+    # timeout: 10s            # Timeout para envio de alertas (padrão: 10s)
+    # api_version: v2         # Versão da API do Alertmanager (v1 ou v2)
 
 # -----------------------------------------------------------------------------
 # CONFIGURAÇÃO DE COLETA DE MÉTRICAS (SCRAPE CONFIGS)
@@ -58,6 +76,163 @@ scrape_configs:
       - targets: ['IP_INSTANCIA_1:8080', 'IP_INSTANCIA_2:8080']
     # Métricas coletadas: CPU/memória de containers, I/O, rede de containers
     # Porta padrão: 8080
+  
+  # ---------------------------------------------------------------------------
+  # EXEMPLOS DE CONFIGURAÇÕES ADICIONAIS (COMENTADOS)
+  # ---------------------------------------------------------------------------
+  
+  # # JOB COM AUTENTICAÇÃO BÁSICA
+  # - job_name: 'app-with-auth'
+  #   static_configs:
+  #     - targets: ['app.example.com:9090']
+  #   basic_auth:
+  #     username: 'prometheus'
+  #     password: 'secret'
+  
+  # # JOB COM TLS/HTTPS
+  # - job_name: 'secure-app'
+  #   scheme: https
+  #   tls_config:
+  #     ca_file: /etc/prometheus/certs/ca.crt
+  #     cert_file: /etc/prometheus/certs/client.crt
+  #     key_file: /etc/prometheus/certs/client.key
+  #     insecure_skip_verify: false
+  #   static_configs:
+  #     - targets: ['secure.example.com:443']
+  
+  # # JOB COM SERVICE DISCOVERY (EC2)
+  # - job_name: 'ec2-discovery'
+  #   ec2_sd_configs:
+  #     - region: us-east-1
+  #       access_key: YOUR_ACCESS_KEY
+  #       secret_key: YOUR_SECRET_KEY
+  #       port: 9100
+  #   relabel_configs:
+  #     - source_labels: [__meta_ec2_tag_Name]
+  #       target_label: instance_name
+  #     - source_labels: [__meta_ec2_instance_id]
+  #       target_label: instance_id
+  
+  # # JOB COM SERVICE DISCOVERY (KUBERNETES)
+  # - job_name: 'kubernetes-pods'
+  #   kubernetes_sd_configs:
+  #     - role: pod
+  #   relabel_configs:
+  #     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+  #       action: keep
+  #       regex: true
+  #     - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+  #       action: replace
+  #       target_label: __metrics_path__
+  #       regex: (.+)
+  
+  # # JOB COM FILE SERVICE DISCOVERY
+  # - job_name: 'file-sd'
+  #   file_sd_configs:
+  #     - files:
+  #       - '/etc/prometheus/targets/*.json'
+  #       - '/etc/prometheus/targets/*.yml'
+  #       refresh_interval: 5m
+  
+  # # JOB COM RELABEL CONFIGS (Manipulação de labels)
+  # - job_name: 'app-with-relabeling'
+  #   static_configs:
+  #     - targets: ['app1:9090', 'app2:9090']
+  #       labels:
+  #         env: 'production'
+  #         team: 'backend'
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
+  
+  # # JOB COM METRIC RELABELING (Filtrar/modificar métricas após coleta)
+  # - job_name: 'app-with-metric-relabeling'
+  #   static_configs:
+  #     - targets: ['app:9090']
+  #   metric_relabel_configs:
+  #     - source_labels: [__name__]
+  #       regex: 'go_.*'
+  #       action: drop  # Remove todas as métricas que começam com 'go_'
+  #     - source_labels: [status]
+  #       regex: '5..'
+  #       action: keep  # Mantém apenas métricas com status 5xx
+  
+  # # JOB PARA BLACKBOX EXPORTER (Monitoramento de endpoints HTTP/TCP/ICMP)
+  # - job_name: 'blackbox-http'
+  #   metrics_path: /probe
+  #   params:
+  #     module: [http_2xx]
+  #   static_configs:
+  #     - targets:
+  #       - https://example.com
+  #       - https://api.example.com/health
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: __param_target
+  #     - source_labels: [__param_target]
+  #       target_label: instance
+  #     - target_label: __address__
+  #       replacement: blackbox-exporter:9115
+  
+  # # JOB PARA MYSQL EXPORTER
+  # - job_name: 'mysql'
+  #   static_configs:
+  #     - targets: ['mysql-exporter:9104']
+  
+  # # JOB PARA POSTGRES EXPORTER
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres-exporter:9187']
+  
+  # # JOB PARA REDIS EXPORTER
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis-exporter:9121']
+  
+  # # JOB PARA NGINX EXPORTER
+  # - job_name: 'nginx'
+  #   static_configs:
+  #     - targets: ['nginx-exporter:9113']
+  
+  # # JOB COM SCRAPE INTERVAL CUSTOMIZADO
+  # - job_name: 'slow-scrape'
+  #   scrape_interval: 60s      # Override do intervalo global
+  #   scrape_timeout: 30s       # Timeout específico para este job
+  #   static_configs:
+  #     - targets: ['slow-app:9090']
+  
+  # # JOB COM HONOR LABELS (Preservar labels do target)
+  # - job_name: 'federated'
+  #   honor_labels: true        # Não sobrescrever labels do target
+  #   metrics_path: '/federate'
+  #   params:
+  #     'match[]':
+  #       - '{job="prometheus"}'
+  #       - '{__name__=~"job:.*"}'
+  #   static_configs:
+  #     - targets: ['prometheus-remote:9090']
+  
+  # # JOB PARA PUSHGATEWAY
+  # - job_name: 'pushgateway'
+  #   honor_labels: true
+  #   static_configs:
+  #     - targets: ['pushgateway:9091']
+
+# -----------------------------------------------------------------------------
+# CONFIGURAÇÕES ADICIONAIS DE ARMAZENAMENTO E RETENÇÃO
+# -----------------------------------------------------------------------------
+# Estas configurações são definidas via flags na linha de comando ou docker-compose:
+# --storage.tsdb.path=/prometheus                    # Diretório de dados
+# --storage.tsdb.retention.time=15d                  # Retenção por tempo (padrão: 15 dias)
+# --storage.tsdb.retention.size=50GB                 # Retenção por tamanho
+# --web.enable-lifecycle                             # Habilita reload via API
+# --web.enable-admin-api                             # Habilita API administrativa
+# --web.console.templates=/etc/prometheus/consoles   # Templates de console
+# --web.console.libraries=/etc/prometheus/console_libraries
 
 # =============================================================================
 # INSTRUÇÕES DE CONFIGURAÇÃO:
