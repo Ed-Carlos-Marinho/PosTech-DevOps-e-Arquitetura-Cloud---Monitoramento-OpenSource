@@ -114,6 +114,30 @@ Cada aula possui sua própria branch com materiais específicos e documentação
 
 **Tecnologias:** Jaeger, OpenTracing, Distributed Tracing, Node.js, Python Flask
 
+---
+
+#### [Aula 07 - Observabilidade no Kubernetes](../../tree/aula-07)
+**Objetivo:** Integrar parte da stack de observabilidade (Prometheus, Grafana, Loki) dentro de um cluster Kubernetes, entendendo as melhores práticas de deployment e coleta de dados.
+
+**Teoria Abordada:**
+- Conceitos de observabilidade em ambientes orquestrados
+- Prometheus Operator para gerenciamento declarativo
+- ServiceMonitor e PodMonitor para descoberta automática
+- Coleta de métricas de aplicações, pods e nodes
+- Integração com Grafana e Loki
+- Boas práticas de deployment e descoberta automática de métricas
+
+**Conteúdo:**
+- Cluster EKS (Amazon Elastic Kubernetes Service)
+- Prometheus Operator com kube-prometheus-stack
+- ServiceMonitor e PodMonitor para descoberta de targets
+- Grafana para visualização unificada
+- Loki para agregação de logs em Kubernetes
+- Aplicações demo instrumentadas
+- Instância EC2 Bastion com kubectl, helm e code-server
+
+**Tecnologias:** Kubernetes, EKS, Prometheus Operator, Helm, ServiceMonitor, PodMonitor, Grafana, Loki
+
 ## 🚀 Como Usar
 
 ### 1. Escolher a Aula
@@ -124,6 +148,7 @@ git checkout aula-02  # Para Prometheus
 git checkout aula-03  # Para Grafana
 git checkout aula-04  # Para Logs com Loki
 git checkout aula-05  # Para Tracing com Jaeger
+git checkout aula-07  # Para Observabilidade no Kubernetes
 ```
 
 ### 2. Seguir a Documentação
@@ -209,6 +234,41 @@ Cada branch contém:
 └─────────────────┘    └─────────────────┘
 ```
 
+### Aula 07 (Observabilidade no Kubernetes)
+```
+┌─────────────────────────────────────────┐
+│         Cluster EKS (Kubernetes)        │
+│                                         │
+│  ┌──────────────────────────────────┐  │
+│  │   Namespace: monitoring          │  │
+│  │                                  │  │
+│  │  • Prometheus Operator           │  │
+│  │  • Grafana                       │  │
+│  │  • Loki                          │  │
+│  │  • ServiceMonitor                │  │
+│  │  • PodMonitor                    │  │
+│  └──────────────────────────────────┘  │
+│                                         │
+│  ┌──────────────────────────────────┐  │
+│  │   Namespace: demo-apps           │  │
+│  │                                  │  │
+│  │  • Web App (instrumentada)       │  │
+│  │  • CronJob (com PodMonitor)      │  │
+│  │  • Métricas expostas             │  │
+│  └──────────────────────────────────┘  │
+└─────────────────────────────────────────┘
+           ▲
+           │
+┌──────────┴──────────┐
+│  Instância Bastion  │
+│                     │
+│  • kubectl          │
+│  • helm             │
+│  • code-server      │
+│  • AWS CLI          │
+└─────────────────────┘
+```
+
 ## 🎯 Objetivos de Aprendizado
 
 Ao completar este módulo, você será capaz de:
@@ -221,6 +281,8 @@ Ao completar este módulo, você será capaz de:
 - **Integrar** múltiplas ferramentas de monitoramento
 - **Aplicar** boas práticas de observabilidade completa (métricas, logs, traces)
 - **Automatizar** deployment de stacks de monitoramento
+- **Configurar** observabilidade nativa em Kubernetes com Prometheus Operator
+- **Utilizar** ServiceMonitor e PodMonitor para descoberta automática de métricas
 
 ## 📖 Recursos Adicionais
 
@@ -229,10 +291,13 @@ Ao completar este módulo, você será capaz de:
 - [Documentação oficial do Grafana](https://grafana.com/docs/)
 - [Documentação oficial do Loki](https://grafana.com/docs/loki/latest/)
 - [Documentação oficial do Jaeger](https://www.jaegertracing.io/docs/)
+- [Documentação oficial do Kubernetes](https://kubernetes.io/docs/)
+- [Prometheus Operator](https://prometheus-operator.dev/)
 - [PromQL Tutorial](https://prometheus.io/docs/prometheus/latest/querying/basics/)
 - [LogQL Tutorial](https://grafana.com/docs/loki/latest/logql/)
 - [OpenTracing Specification](https://opentracing.io/specification/)
 - [Grafana Dashboard Gallery](https://grafana.com/grafana/dashboards/)
+- [Helm Charts](https://helm.sh/docs/)
 
 ## 🤝 Contribuição
 
