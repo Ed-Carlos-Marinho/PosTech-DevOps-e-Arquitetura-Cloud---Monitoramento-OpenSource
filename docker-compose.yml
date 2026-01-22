@@ -25,6 +25,15 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=admin123     # Senha do admin (ALTERAR EM PRODUÇÃO)
       - GF_USERS_ALLOW_SIGN_UP=false            # Desabilita auto-registro
       - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
+      
+      # Configurações SMTP para envio de alertas por email (descomente para usar)
+      # - GF_SMTP_ENABLED=true                    # Habilita SMTP
+      # - GF_SMTP_HOST=smtp.gmail.com:587         # Servidor SMTP (exemplo: Gmail)
+      # - GF_SMTP_USER=seu-email@gmail.com        # Usuário SMTP
+      # - GF_SMTP_PASSWORD=sua-senha-app          # Senha de app do Gmail
+      # - GF_SMTP_FROM_ADDRESS=seu-email@gmail.com # Email remetente
+      # - GF_SMTP_FROM_NAME=Grafana Monitoring    # Nome do remetente
+      # - GF_SMTP_SKIP_VERIFY=false               # Verificar certificado SSL
     
     # Volumes para dados persistentes e configurações
     volumes:
@@ -268,7 +277,7 @@ networks:
 #
 # 3. Configurar Data Sources no Grafana:
 #    - Prometheus: http://prometheus:9090
-#    - Zabbix: http://zabbix-web:8080/api_jsonrpc.php
+#    - Zabbix: http://zabbix-web:8080/api_jsonrpc.php (aguarde 1-2 min após iniciar)
 #
 # 4. Para ver logs:
 #    docker-compose logs -f [nome_do_serviço]

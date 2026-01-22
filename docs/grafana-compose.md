@@ -65,6 +65,18 @@ docker-compose logs -f
    - **Password**: `zabbix` (senha padrão do Zabbix)
 6. **Save & Test**
 
+**Nota importante**: Aguarde 1-2 minutos após iniciar a stack para que o Zabbix esteja completamente inicializado. Se receber erro "connection refused", verifique:
+```bash
+# Verificar se o Zabbix Web está rodando
+docker-compose logs zabbix-web
+
+# Verificar se o Zabbix Server está pronto
+docker-compose logs zabbix-server | grep "server started"
+
+# Testar conectividade do Grafana para o Zabbix
+docker-compose exec grafana wget -O- http://zabbix-web:8080
+```
+
 #### Alertmanager Data Source
 1. **Configuration** → **Data Sources** → **Add data source**
 2. **Type**: Alertmanager
@@ -74,14 +86,16 @@ docker-compose logs -f
 
 ### 4. Importar dashboards recomendados
 
+Você pode buscar mais dashboards prontos em: https://grafana.com/grafana/dashboards
+
 #### Para Prometheus
 - **Node Exporter Full** (ID: 1860)
-- **Docker Container & Host Metrics** (ID: 179)
+- **Docker Container & Host Metrics** (ID: 19724)
 - **Prometheus Stats** (ID: 2)
 
 #### Para Zabbix
-- **Zabbix Server Dashboard** (ID: 11663)
-- **Zabbix System Status** (ID: 12787)
+- **Zabbix - Full Server Status** (ID: 5363)
+- **Zabbix Server Dashboard** (ID: 8955)
 
 #### Para Alertmanager
 - **Alertmanager Overview** (ID: 9578)
@@ -195,6 +209,7 @@ Para funcionar corretamente na AWS, libere as portas:
 - **80**: Interface web do Grafana
 - **9090**: Interface web do Prometheus
 - **9093**: Interface web do Alertmanager
+- **8080**: Code-server
 - **8081**: Interface web do Zabbix
 - **10051**: Zabbix Server (para agentes)
 - **10050**: Zabbix Agent (do servidor para agentes)
