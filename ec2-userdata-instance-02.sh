@@ -110,6 +110,10 @@ ufw --force enable                          # Habilita firewall (força sem prom
 ufw allow ssh                               # Permite SSH (porta 22)
 ufw allow http                              # Permite HTTP (porta 80) - para frontend
 ufw allow 5000                              # Permite Backend API
+ufw allow 15672                             # Permite RabbitMQ Management UI
+check_status "Configuração do firewall"
+ufw allow http                              # Permite HTTP (porta 80) - para frontend
+ufw allow 5000                              # Permite Backend API
 ufw allow 9080                              # Permite Promtail (métricas)
 ufw allow 15672                             # Permite RabbitMQ Management UI
 check_status "Configuração do firewall"
@@ -133,17 +137,15 @@ echo "🚀 Serviços instalados e configurados:"
 echo "   - Frontend: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)"
 echo "   - Backend API: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5000"
 echo "   - RabbitMQ Management: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):15672 (guest/guest)"
-echo "   - Promtail: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9080/metrics"
+echo "   - Jaeger Agent Metrics: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):5778/metrics"
 echo ""
 echo "⚠️  PRÓXIMOS PASSOS MANUAIS:"
-echo "   1. Obter IP privado da instância de observabilidade (Instância 1)"
+echo "   1. Obter IP privado da instância de tracing (Instância 1)"
 echo "   2. Editar: /home/ubuntu/repo/distributed-app/docker-compose-app.yml"
 echo "   3. Substituir JAEGER_COLLECTOR_IP pelo IP real da Instância 1"
-echo "   4. Editar: /home/ubuntu/repo/distributed-app/promtail-app-config.yml"
-echo "   5. Substituir LOKI_SERVER_IP pelo IP real da Instância 1"
-echo "   6. Executar: cd /home/ubuntu/repo/distributed-app && docker-compose -f docker-compose-app.yml restart jaeger-agent promtail"
-echo "   7. Testar aplicações: curl http://localhost/api/users"
-echo "   8. Verificar traces no Jaeger UI e logs no Grafana"
+echo "   4. Executar: cd /home/ubuntu/repo/distributed-app && docker-compose -f docker-compose-app.yml restart jaeger-agent"
+echo "   5. Testar aplicações: curl http://localhost/api/users"
+echo "   6. Verificar traces no Jaeger UI"
 echo ""
 echo "🔧 Comandos úteis:"
 echo "   - Testar frontend: curl http://localhost/"
@@ -152,7 +154,7 @@ echo "   - Listar produtos: curl http://localhost/api/products"
 echo "   - Criar pedido: curl -X POST http://localhost/api/orders -H 'Content-Type: application/json' -d '{\"user_id\":1,\"total_amount\":99.99}'"
 echo "   - Ver logs da stack: cd /home/ubuntu/repo/distributed-app && docker-compose -f docker-compose-app.yml logs -f"
 echo "   - Status da stack: cd /home/ubuntu/repo/distributed-app && docker-compose -f docker-compose-app.yml ps"
-echo "   - Verificar Promtail: curl http://localhost:9080/metrics"
+echo "   - Verificar Jaeger Agent: curl http://localhost:5778/metrics"
 echo "   - Logs de instalação: sudo tail -f /var/log/user-data.log"
 
 # =============================================================================
@@ -166,7 +168,6 @@ echo "   - Logs de instalação: sudo tail -f /var/log/user-data.log"
 #
 # ARQUIVOS DE CONFIGURAÇÃO:
 # - Docker Compose: /home/ubuntu/repo/distributed-app/docker-compose-app.yml
-# - Promtail config: /home/ubuntu/repo/distributed-app/promtail-app-config.yml
 # - Jaeger Agent config: /home/ubuntu/repo/distributed-app/jaeger-agent-config.yml
 # - Frontend: /home/ubuntu/repo/distributed-app/frontend/
 # - Backend: /home/ubuntu/repo/distributed-app/backend/
@@ -181,7 +182,6 @@ echo "   - Logs de instalação: sudo tail -f /var/log/user-data.log"
 # - 15672: RabbitMQ Management UI
 # - 6831/6832: Jaeger Agent (UDP)
 # - 5778: Jaeger Agent HTTP
-# - 9080: Promtail (métricas)
 #
 # COMANDOS DE MANUTENÇÃO:
 # - Reiniciar stack: docker-compose -f docker-compose-app.yml restart
@@ -193,10 +193,8 @@ echo "   - Logs de instalação: sudo tail -f /var/log/user-data.log"
 #
 # CONFIGURAÇÃO FINAL NECESSÁRIA:
 # 1. Substituir JAEGER_COLLECTOR_IP pelo IP real da instância 1 em docker-compose-app.yml
-# 2. Substituir LOKI_SERVER_IP pelo IP real da instância 1 em promtail-app-config.yml
-# 3. Verificar traces no Jaeger UI
-# 4. Verificar logs correlacionados no Grafana
-# 5. Testar correlação entre traces, logs e métricas
+# 2. Verificar traces no Jaeger UI
+# 3. Testar rastreamento de requisições entre serviços
 #
 # ENDPOINTS DAS APLICAÇÕES:
 # - GET /: Página inicial do frontend

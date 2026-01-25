@@ -197,37 +197,6 @@ services:
       - app-network
     restart: unless-stopped
 
-  # ---------------------------------------------------------------------------
-  # PROMTAIL - Coleta de logs para envio ao Loki
-  # ---------------------------------------------------------------------------
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail-app
-    
-    # Porta para métricas do Promtail
-    ports:
-      - "9080:9080"
-    
-    # Volumes para configuração e acesso aos logs
-    volumes:
-      - ./promtail-app-config.yml:/etc/promtail/config.yml
-      - frontend-logs:/app/logs/frontend:ro
-      - backend-logs:/app/logs/backend:ro
-      - /var/log:/var/log:ro
-      - promtail-positions:/tmp/positions
-    
-    # Parâmetros de inicialização do Promtail
-    command: -config.file=/etc/promtail/config.yml
-    
-    networks:
-      - app-network
-    restart: unless-stopped
-    
-    # Aguarda outros serviços estarem prontos
-    depends_on:
-      - frontend
-      - backend
-
 # -----------------------------------------------------------------------------
 # VOLUMES PERSISTENTES - Para manter dados entre reinicializações
 # -----------------------------------------------------------------------------
@@ -237,7 +206,6 @@ volumes:
   rabbitmq-data:        # Dados do RabbitMQ
   frontend-logs:        # Logs do frontend
   backend-logs:         # Logs do backend
-  promtail-positions:   # Posições de leitura dos arquivos de log pelo Promtail
 
 # -----------------------------------------------------------------------------
 # REDES - Rede interna para comunicação entre serviços
@@ -256,7 +224,7 @@ networks:
 #    - Frontend: http://IP_INSTANCIA_2
 #    - Backend API: http://IP_INSTANCIA_2:5000
 #    - RabbitMQ Management: http://IP_INSTANCIA_2:15672 (guest/guest)
-#    - Métricas Promtail: http://IP_INSTANCIA_2:9080/metrics
+#    - Jaeger Agent Metrics: http://IP_INSTANCIA_2:5778/metrics
 #
 # 3. Para gerar traces de teste:
 #    curl http://IP_INSTANCIA_2/api/users

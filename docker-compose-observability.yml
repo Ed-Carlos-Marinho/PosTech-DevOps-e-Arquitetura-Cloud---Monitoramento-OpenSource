@@ -1,16 +1,16 @@
 # =============================================================================
-# DOCKER COMPOSE - COMPLETE OBSERVABILITY STACK
+# DOCKER COMPOSE - JAEGER TRACING STACK
 # =============================================================================
-# Este arquivo configura uma stack completa de observabilidade com Grafana,
-# Prometheus, Loki, Promtail e Jaeger para a Aula 05 do curso PosTech DevOps
-# Foco: Observabilidade completa com métricas, logs e traces distribuídos
+# Este arquivo configura stack de tracing distribuído com Jaeger e Grafana
+# Aula 05 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
+# Foco: Tracing distribuído para rastreamento de requisições entre serviços
 # =============================================================================
 
 version: '3.8'
 
 services:
   # ---------------------------------------------------------------------------
-  # GRAFANA - Plataforma de visualização unificada (logs + métricas + traces)
+  # GRAFANA - Plataforma de visualização de traces
   # ---------------------------------------------------------------------------
   grafana:
     image: grafana/grafana:latest
@@ -24,8 +24,7 @@ services:
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin123     # Senha do admin (ALTERAR EM PRODUÇÃO)
       - GF_USERS_ALLOW_SIGN_UP=false            # Desabilita auto-registro
-      - GF_INSTALL_PLUGINS=grafana-clock-panel,grafana-simple-json-datasource
-      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor,correlations # Habilita editor TraceQL e correlações
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor # Habilita editor TraceQL
     
     # Volumes para dados persistentes e configurações
     volumes:
@@ -36,93 +35,9 @@ services:
       - monitoring
     restart: unless-stopped
     
-    # Aguarda outros serviços estarem prontos
+    # Aguarda Jaeger estar pronto
     depends_on:
-      - prometheus
-      - loki
       - jaeger
-
-  # ---------------------------------------------------------------------------
-  # PROMETHEUS SERVER - Coleta e armazenamento de métricas
-  # ---------------------------------------------------------------------------
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: prometheus
-    
-    # Porta de acesso à interface web do Prometheus
-    ports:
-      - "9090:9090"
-    
-    # Volumes para configuração e dados persistentes
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml           # Configuração principal
-      - prometheus-data:/prometheus                               # Dados persistentes
-    
-    # Parâmetros de inicialização do Prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'           # Arquivo de configuração
-      - '--storage.tsdb.path=/prometheus'                        # Caminho dos dados
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=200h'                     # Retenção de dados: 200 horas
-      - '--web.enable-lifecycle'                                 # Permite reload via API
-      - '--web.enable-admin-api'                                 # Habilita API administrativa
-    
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # LOKI - Sistema de agregação de logs
-  # ---------------------------------------------------------------------------
-  loki:
-    image: grafana/loki:latest
-    container_name: loki
-    
-    # Porta de acesso à API do Loki
-    ports:
-      - "3100:3100"
-    
-    # Volumes para configuração e dados persistentes
-    volumes:
-      - ./loki-config.yml:/etc/loki/local-config.yaml    # Configuração do Loki
-      - loki-data:/loki                                   # Dados persistentes dos logs
-    
-    # Parâmetros de inicialização do Loki
-    command: -config.file=/etc/loki/local-config.yaml
-    
-    networks:
-      - monitoring
-    restart: unless-stopped
-
-  # ---------------------------------------------------------------------------
-  # PROMTAIL - Agente de coleta de logs para Loki
-  # ---------------------------------------------------------------------------
-  promtail:
-    image: grafana/promtail:latest
-    container_name: promtail
-    
-    # Porta para métricas do Promtail
-    ports:
-      - "9080:9080"
-    
-    # Volumes para configuração e acesso aos logs
-    volumes:
-      - ./promtail-config.yml:/etc/promtail/config.yml   # Configuração do Promtail
-      - /var/log:/var/log:ro                             # Logs do sistema (somente leitura)
-      - /var/lib/docker/containers:/var/lib/docker/containers:ro  # Logs dos containers
-      - promtail-positions:/tmp/positions                # Posições de leitura dos arquivos
-    
-    # Parâmetros de inicialização do Promtail
-    command: -config.file=/etc/promtail/config.yml
-    
-    networks:
-      - monitoring
-    restart: unless-stopped
-    
-    # Aguarda Loki estar rodando
-    depends_on:
-      - loki
 
   # ---------------------------------------------------------------------------
   # JAEGER ALL-IN-ONE - Tracing distribuído completo (desenvolvimento)
@@ -156,9 +71,6 @@ services:
 volumes:
   grafana-data:         # Dados do Grafana (dashboards, usuários, configurações)
   grafana-config:       # Configurações personalizadas do Grafana
-  prometheus-data:      # Dados do Prometheus (métricas, índices)
-  loki-data:            # Dados do Loki (logs, índices, chunks)
-  promtail-positions:   # Posições de leitura dos arquivos de log pelo Promtail
 
 # -----------------------------------------------------------------------------
 # REDES - Rede interna para comunicação entre serviços
@@ -170,19 +82,14 @@ networks:
 # =============================================================================
 # INSTRUÇÕES DE USO - AULA 05:
 # =============================================================================
-# 1. Para iniciar a stack completa:
+# 1. Para iniciar a stack de tracing:
 #    docker-compose -f docker-compose-observability.yml up -d
 #
 # 2. Para acessar as interfaces:
 #    - Grafana: http://IP_SERVIDOR:3000 (admin/admin123)
-#    - Prometheus: http://IP_SERVIDOR:9090
-#    - Loki: http://IP_SERVIDOR:3100 (API - não tem interface web)
 #    - Jaeger UI: http://IP_SERVIDOR:16686
-#    - Elasticsearch: http://IP_SERVIDOR:9200
 #
-# 3. Configurar Data Sources no Grafana:
-#    - Prometheus: http://prometheus:9090
-#    - Loki: http://loki:3100
+# 3. Configurar Data Source no Grafana:
 #    - Jaeger: http://jaeger:16686
 #
 # 4. Para ver logs:
@@ -192,14 +99,12 @@ networks:
 #    docker-compose -f docker-compose-observability.yml down
 # =============================================================================
 #
-# INTEGRAÇÃO GRAFANA + PROMETHEUS + LOKI + JAEGER:
+# TRACING DISTRIBUÍDO COM JAEGER:
 # =============================================================================
-# 1. Grafana como frontend unificado para métricas, logs e traces
-# 2. Prometheus para métricas de aplicações e infraestrutura
-# 3. Loki para logs centralizados com correlação por trace_id
-# 4. Jaeger para tracing distribuído completo
-# 5. Elasticsearch como backend de armazenamento para traces
-# 6. Dashboards combinando os três pilares da observabilidade
-# 7. Correlação temporal entre traces, logs e métricas
-# 8. Foco educacional: observabilidade completa em microserviços
+# 1. Grafana como frontend para visualização de traces
+# 2. Jaeger para tracing distribuído completo
+# 3. Rastreamento de requisições entre múltiplos serviços
+# 4. Identificação de gargalos e latências
+# 5. Análise de dependências entre serviços
+# 6. Foco educacional: tracing distribuído em microserviços
 # =============================================================================

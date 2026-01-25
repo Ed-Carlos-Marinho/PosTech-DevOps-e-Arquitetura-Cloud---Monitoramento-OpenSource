@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # =============================================================================
-# EC2 USER DATA SCRIPT - OBSERVABILITY STACK INSTANCE
+# EC2 USER DATA SCRIPT - JAEGER TRACING STACK INSTANCE
 # =============================================================================
 # Aula 05 - PosTech DevOps - Monitoramento OpenSource
-# Stack: Grafana + Prometheus + Loki + Jaeger + Promtail + Code-server
+# Stack: Grafana + Jaeger + Code-server
 # =============================================================================
 
 # Configurações de ambiente
@@ -114,13 +114,10 @@ echo "🔥 Configurando firewall..."
 ufw --force enable
 ufw allow ssh
 ufw allow 3000                              # Grafana
-ufw allow 9090                              # Prometheus
-ufw allow 3100                              # Loki API
 ufw allow 16686                             # Jaeger UI
 ufw allow 14250                             # Jaeger Collector gRPC
 ufw allow 14268                             # Jaeger Collector HTTP
 ufw allow 8080                              # Code-server
-ufw allow 9080                              # Promtail metrics
 check_status "Configuração do firewall"
 
 # Verificação final
@@ -131,34 +128,29 @@ systemctl is-active code-server && echo "✅ Code-server está rodando"
 # Finalização
 echo "=== ✅ Configuração concluída com sucesso em $(date) ==="
 echo ""
-echo "🎯 AULA 05 - STACK DE OBSERVABILIDADE COMPLETA PREPARADA"
+echo "🎯 AULA 05 - STACK DE TRACING DISTRIBUÍDO PREPARADA"
 echo "======================================================="
 echo "🌐 Code-server disponível em: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
 echo "🔑 Senha: demo123"
 echo ""
 echo "📊 PRÓXIMOS PASSOS PARA AULA 05:"
 echo "1. Clonar repositório: git clone -b aula-05 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git"
-echo "2. Executar stack de observabilidade: docker-compose -f docker-compose-observability.yml up -d"
+echo "2. Executar stack de tracing: docker-compose -f docker-compose-observability.yml up -d"
 echo "3. Acessar interfaces:"
 echo "   - Grafana: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3000 (admin/admin123)"
-echo "   - Prometheus: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9090"
 echo "   - Jaeger UI: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):16686"
-echo "   - Loki API: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3100"
-echo "   - Promtail Metrics: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9080/metrics"
 echo ""
 echo "🐳 Docker e Docker Compose instalados e configurados"
-echo "🔧 Sistema pronto para observabilidade completa com tracing distribuído"
+echo "🔧 Sistema pronto para tracing distribuído com Jaeger"
 
 # =============================================================================
 # INFORMAÇÕES IMPORTANTES:
 # 
-# STACK COMPLETA: Grafana (3000) + Prometheus (9090) + Loki (3100) + Jaeger (16686)
+# STACK DE TRACING: Grafana (3000) + Jaeger (16686)
 # CODE-SERVER: http://IP:8080 (senha: demo123)
 # 
-# DATA SOURCES NO GRAFANA:
-# - Prometheus: http://prometheus:9090
-# - Loki: http://loki:3100  
-# - Jaeger: http://jaeger-query:16686
+# DATA SOURCE NO GRAFANA:
+# - Jaeger: http://jaeger:16686
 #
 # COMANDOS ÚTEIS:
 # - Logs: sudo tail -f /var/log/user-data.log
