@@ -72,8 +72,8 @@ Stack de aplicação de teste para Instância 2:
 ### 1. Instância 1 (Observabilidade)
 ```bash
 # Clonar repositório
-git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
-cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
+git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git PosTech
+cd PosTech
 
 # Iniciar stack de observabilidade
 docker-compose -f docker-compose-observability.yml up -d
@@ -87,18 +87,45 @@ docker-compose -f docker-compose-observability.yml up -d
 ### 2. Instância 2 (Aplicação de Teste)
 ```bash
 # Clonar repositório
-git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
-cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource/test-app
+git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git PosTech
+cd PosTech/test-app
 
-# Configurar IP do Loki
+# Configurar IP do Loki (substitua pelo IP privado da Instância 1)
 sed -i 's/LOKI_SERVER_IP/IP_PRIVADO_INSTANCIA_1/' promtail-app-config.yml
 
 # Iniciar stack de aplicação
 docker-compose -f docker-compose-app.yml up -d
 
-# Testar aplicação
+# Aguardar alguns segundos
+sleep 15
+
+# Gerar tráfego inicial para criar logs
 curl http://localhost/
-curl http://localhost/generate/100
+curl http://localhost/generate/50
+curl http://localhost/health
+```
+
+**Nota:** A stack inclui um `traffic-generator` que gera tráfego HTTP automaticamente a cada 5-10 segundos, garantindo que sempre haverá logs sendo gerados.
+
+**Configuração Automática do IP do Loki:**
+
+O script de userdata da Instância 2 pode configurar automaticamente o IP do Loki usando uma das seguintes opções:
+
+1. **Variável de ambiente** (adicione no início do userdata):
+```bash
+export LOKI_SERVER_IP="10.0.1.100"
+```
+
+2. **Tag da instância EC2**:
+```
+Key: LokiServerIP
+Value: 10.0.1.100
+```
+
+3. **SSM Parameter Store**:
+```bash
+aws ssm put-parameter --name "/observability/loki-server-ip" \
+  --value "10.0.1.100" --type String
 ```
 
 ### 3. Configurar Data Sources no Grafana

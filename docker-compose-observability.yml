@@ -13,7 +13,7 @@ services:
   # GRAFANA - Plataforma de visualização unificada (logs + métricas)
   # ---------------------------------------------------------------------------
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.4.0
     container_name: grafana
     
     # Porta de acesso à interface web do Grafana
@@ -45,7 +45,7 @@ services:
   # PROMETHEUS SERVER - Coleta e armazenamento de métricas
   # ---------------------------------------------------------------------------
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.55.1
     container_name: prometheus
     
     # Porta de acesso à interface web do Prometheus
@@ -75,7 +75,7 @@ services:
   # LOKI - Sistema de agregação de logs
   # ---------------------------------------------------------------------------
   loki:
-    image: grafana/loki:latest
+    image: grafana/loki:3.3.1
     container_name: loki
     
     # Porta de acesso à API do Loki
@@ -100,7 +100,7 @@ services:
   # PROMTAIL - Agente de coleta de logs para Loki
   # ---------------------------------------------------------------------------
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.3.1
     container_name: promtail
     
     # Porta para métricas do Promtail

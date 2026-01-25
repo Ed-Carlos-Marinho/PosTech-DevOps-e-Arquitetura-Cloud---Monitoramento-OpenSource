@@ -83,7 +83,7 @@ check_status "Configuração do Docker"
 
 echo "🐳 Instalando Docker Compose..."
 # Download da versão específica para arquitetura ARM64 (t4g.small)
-curl -L "https://github.com/docker/compose/releases/download/v2.24.5/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
+curl -L "https://github.com/docker/compose/releases/download/v2.31.0/docker-compose-linux-aarch64" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose       # Torna executável
 check_status "Instalação do Docker Compose"
 
@@ -198,21 +198,28 @@ systemctl is-active code-server && echo "✅ Code-server está rodando"
 # FINALIZAÇÃO E INFORMAÇÕES DE ACESSO
 # =============================================================================
 
+# =============================================================================
+# FINALIZAÇÃO E INFORMAÇÕES DE ACESSO
+# =============================================================================
+
+# Capturar IP público da instância
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
 echo "=== ✅ Configuração concluída com sucesso em $(date) ==="
 echo ""
 echo "🎯 AULA 04 - STACK DE OBSERVABILIDADE PREPARADA"
 echo "=============================================="
-echo "🌐 Code-server disponível em: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8080"
+echo "🌐 Code-server disponível em: http://${PUBLIC_IP}:8080"
 echo "🔑 Senha: demo123"
 echo ""
 echo "📊 PRÓXIMOS PASSOS PARA AULA 04:"
-echo "1. Clonar repositório: git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git"
+echo "1. Clonar repositório: git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git PosTech"
 echo "2. Executar stack de observabilidade: docker-compose -f docker-compose-observability.yml up -d"
 echo "3. Acessar interfaces:"
-echo "   - Grafana: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):80 (admin/admin123)"
-echo "   - Prometheus: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9090"
-echo "   - Loki API: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):3100"
-echo "   - Promtail Metrics: http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):9080/metrics"
+echo "   - Grafana: http://${PUBLIC_IP}:80 (admin/admin123)"
+echo "   - Prometheus: http://${PUBLIC_IP}:9090"
+echo "   - Loki API: http://${PUBLIC_IP}:3100"
+echo "   - Promtail Metrics: http://${PUBLIC_IP}:9080/metrics"
 echo ""
 echo "🐳 Docker e Docker Compose instalados e configurados"
 echo "🔧 Sistema pronto para observabilidade completa com logs centralizados"

@@ -186,8 +186,8 @@ aws ec2 run-instances \
 Após criar as duas instâncias, clone o repositório para ter acesso aos arquivos necessários:
 
 ```bash
-git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
-cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
+git clone -b aula-04 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git PosTech
+cd PosTech
 docker-compose -f docker-compose-observability.yml up -d
 ```
 

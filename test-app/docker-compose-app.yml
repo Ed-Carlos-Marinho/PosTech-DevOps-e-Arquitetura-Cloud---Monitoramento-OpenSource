@@ -46,7 +46,7 @@ services:
   # NGINX - Proxy reverso e gerador de logs de acesso
   # ---------------------------------------------------------------------------
   nginx:
-    image: nginx:latest
+    image: nginx:1.27-alpine
     container_name: nginx-proxy
     
     # Porta de acesso externa
@@ -57,6 +57,14 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf    # Configuração personalizada
       - nginx-logs:/var/log/nginx             # Logs do Nginx
+    
+    # Remover symlinks e criar arquivos reais de log
+    command: >
+      sh -c "
+        rm -f /var/log/nginx/access.log /var/log/nginx/error.log &&
+        touch /var/log/nginx/access.log /var/log/nginx/error.log &&
+        nginx -g 'daemon off;'
+      "
     
     networks:
       - app-network
@@ -71,7 +79,7 @@ services:
   # PROMTAIL - Coleta de logs para envio ao Loki
   # ---------------------------------------------------------------------------
   promtail:
-    image: grafana/promtail:latest
+    image: grafana/promtail:3.3.1
     container_name: promtail
     
     # Porta para métricas do Promtail
@@ -82,12 +90,18 @@ services:
     volumes:
       - ./promtail-app-config.yml:/etc/promtail/config.yml  # Configuração do Promtail
       - app-logs:/app/logs                                  # Logs da aplicação
-      - nginx-logs:/var/log/nginx                           # Logs do Nginx
-      - /var/log:/var/log                                   # Logs do sistema
+      - nginx-logs:/var/log/nginx:ro                        # Logs do Nginx (read-only)
+      - /var/log:/var/log/host:ro                           # Logs do sistema host (read-only)
       - promtail-positions:/tmp/positions                   # Posições de leitura dos arquivos
     
     # Parâmetros de inicialização do Promtail
-    command: -config.file=/etc/promtail/config.yml
+    command: 
+      - -config.file=/etc/promtail/config.yml
+      - -config.expand-env=true
+    
+    # Variáveis de ambiente
+    environment:
+      - HOSTNAME=test-app-server
     
     networks:
       - app-network
@@ -102,7 +116,7 @@ services:
   # LOG GENERATOR - Gerador adicional de logs para testes
   # ---------------------------------------------------------------------------
   log-generator:
-    image: alpine:latest
+    image: alpine:3.21
     container_name: log-generator
     
     # Volumes para logs
@@ -125,6 +139,41 @@ services:
     networks:
       - app-network
     restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # TRAFFIC GENERATOR - Gera tráfego HTTP automaticamente
+  # ---------------------------------------------------------------------------
+  traffic-generator:
+    image: alpine:3.21
+    container_name: traffic-generator
+    
+    # Instalar curl e gerar tráfego continuamente
+    command: >
+      sh -c "
+        apk add --no-cache curl;
+        echo 'Aguardando aplicação iniciar...';
+        sleep 30;
+        echo 'Iniciando geração de tráfego...';
+        while true; do
+          curl -s http://nginx/ > /dev/null 2>&1;
+          sleep 5;
+          curl -s http://nginx/health > /dev/null 2>&1;
+          sleep 5;
+          curl -s http://nginx/generate/10 > /dev/null 2>&1;
+          sleep 10;
+          if [ \$$((RANDOM % 5)) -eq 0 ]; then
+            curl -s http://nginx/error > /dev/null 2>&1;
+          fi;
+          sleep 5;
+        done
+      "
+    
+    networks:
+      - app-network
+    restart: unless-stopped
+    depends_on:
+      - nginx
+      - test-app
 
 # -----------------------------------------------------------------------------
 # VOLUMES PERSISTENTES - Para manter logs entre reinicializações
