@@ -5,7 +5,7 @@
 # Aula 05 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
 # =============================================================================
 
-FROM node:16-alpine
+FROM node:18-alpine
 
 # Definir diretório de trabalho
 WORKDIR /app

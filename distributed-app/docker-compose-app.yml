@@ -44,7 +44,7 @@ services:
       - jaeger-agent
 
   # ---------------------------------------------------------------------------
-  # BACKEND SERVICE - Python Flask com instrumentação OpenTelemetry
+  # BACKEND SERVICE - Node.js/Express com instrumentação OpenTelemetry
   # ---------------------------------------------------------------------------
   backend:
     build:
@@ -58,7 +58,7 @@ services:
     
     # Variáveis de ambiente
     environment:
-      - FLASK_ENV=production
+      - NODE_ENV=production
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/ecommerce
       - REDIS_URL=redis://redis:6379/0
       - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
@@ -188,9 +188,10 @@ services:
       - "5778:5778"       # HTTP endpoint para configuração
       - "14271:14271"     # Admin port
     
-    # Configuração do agente - SUBSTITUIR JAEGER_COLLECTOR_HOST pelo IP da instância 1
+    # Configuração do agente - IP da instância 1 (Jaeger Collector)
+    # IMPORTANTE: Substituir pelo IP privado real da instância de observabilidade
     environment:
-      - REPORTER_GRPC_HOST_PORT=${JAEGER_COLLECTOR_HOST:-localhost}:14250
+      - REPORTER_GRPC_HOST_PORT=JAEGER_COLLECTOR_IP:14250
       - LOG_LEVEL=debug
     
     networks:

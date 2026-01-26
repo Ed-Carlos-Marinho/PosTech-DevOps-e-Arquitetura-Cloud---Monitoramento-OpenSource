@@ -1,25 +1,20 @@
 # =============================================================================
 # DOCKERFILE - BACKEND SERVICE
 # =============================================================================
-# Backend service com Python Flask e instrumentação OpenTelemetry
+# Backend service com Node.js/Express e instrumentação OpenTelemetry
 # Aula 05 - PosTech DevOps e Arquitetura Cloud - Monitoramento OpenSource
 # =============================================================================
 
-FROM python:3.9-slim
+FROM node:18-alpine
 
 # Definir diretório de trabalho
 WORKDIR /app
 
-# Instalar dependências do sistema
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
+# Copiar arquivos de dependências
+COPY package*.json ./
 
-# Copiar arquivo de dependências
-COPY requirements.txt .
-
-# Instalar dependências Python
-RUN pip install --no-cache-dir -r requirements.txt
+# Instalar dependências
+RUN npm install --production
 
 # Copiar código da aplicação
 COPY . .
@@ -31,4 +26,4 @@ RUN mkdir -p /app/logs
 EXPOSE 5000
 
 # Comando para iniciar a aplicação com instrumentação
-CMD ["python", "app.py"]
+CMD ["npm", "start"]

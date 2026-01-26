@@ -124,10 +124,14 @@ app.get('/', (req, res) => {
 
 // Get users from backend
 app.get('/api/users', async (req, res) => {
-  const span = tracer.startSpan('get_users', { childOf: req.span });
-  
   try {
     logger.info('Fetching users from backend', { endpoint: '/api/users' });
+    
+    // Simular processamento no frontend ANTES de criar o span (200ms)
+    await new Promise(resolve => setTimeout(resolve, 200));
+    
+    // Agora criar o span para a chamada ao backend
+    const span = tracer.startSpan('get_users', { childOf: req.span });
     
     // Configurar tags do span
     span.setTag('operation.name', 'get_users');
@@ -187,10 +191,14 @@ app.get('/api/users', async (req, res) => {
 
 // Get products from backend
 app.get('/api/products', async (req, res) => {
-  const span = tracer.startSpan('get_products', { childOf: req.span });
-  
   try {
     logger.info('Fetching products from backend', { endpoint: '/api/products' });
+    
+    // Simular processamento no frontend ANTES de criar o span (150ms)
+    await new Promise(resolve => setTimeout(resolve, 150));
+    
+    // Agora criar o span para a chamada ao backend
+    const span = tracer.startSpan('get_products', { childOf: req.span });
     
     span.setTag('operation.name', 'get_products');
     span.setTag('backend.service', 'backend-service');
@@ -249,10 +257,14 @@ app.get('/api/products', async (req, res) => {
 
 // Get orders from backend
 app.get('/api/orders', async (req, res) => {
-  const span = tracer.startSpan('get_orders', { childOf: req.span });
-  
   try {
     logger.info('Fetching orders from backend', { endpoint: '/api/orders' });
+    
+    // Simular processamento no frontend ANTES de criar o span (250ms)
+    await new Promise(resolve => setTimeout(resolve, 250));
+    
+    // Agora criar o span para a chamada ao backend
+    const span = tracer.startSpan('get_orders', { childOf: req.span });
     
     span.setTag('operation.name', 'get_orders');
     span.setTag('backend.service', 'backend-service');
@@ -311,13 +323,17 @@ app.get('/api/orders', async (req, res) => {
 
 // Create order
 app.post('/api/orders', async (req, res) => {
-  const span = tracer.startSpan('create_order', { childOf: req.span });
-  
   try {
     logger.info('Creating new order', { 
       endpoint: '/api/orders',
       orderData: req.body 
     });
+    
+    // Simular validação no frontend ANTES de criar o span (300ms)
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Agora criar o span para a chamada ao backend
+    const span = tracer.startSpan('create_order', { childOf: req.span });
     
     span.setTag('operation.name', 'create_order');
     span.setTag('backend.service', 'backend-service');
