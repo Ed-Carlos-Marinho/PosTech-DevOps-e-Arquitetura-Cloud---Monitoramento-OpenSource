@@ -48,9 +48,6 @@ cd distributed-app
 sed -i 's/JAEGER_COLLECTOR_IP/IP_PRIVADO_INSTANCIA_1/' docker-compose-app.yml
 sed -i 's/JAEGER_COLLECTOR_IP/IP_PRIVADO_INSTANCIA_1/' jaeger-agent-config.yml
 
-# Configurar IP do Loki
-sed -i 's/LOKI_SERVER_IP/IP_PRIVADO_INSTANCIA_1/' promtail-app-config.yml
-
 # Iniciar stack
 docker-compose -f docker-compose-app.yml up -d
 ```
@@ -121,8 +118,7 @@ done
 - **Backend API**: http://IP_INSTANCIA_2:5000
 - **RabbitMQ Management**: http://IP_INSTANCIA_2:15672 (guest/guest)
 
-#### Métricas e logs
-- **Promtail Metrics**: http://IP_INSTANCIA_2:9080/metrics
+#### Métricas
 - **Jaeger Agent Metrics**: http://IP_INSTANCIA_2:5778/metrics
 
 ## Fluxo de Traces
@@ -161,22 +157,16 @@ done
 - **message**: Mensagem descritiva
 - **context**: Dados específicos da operação
 
-### Consultas LogQL para correlação:
-```logql
-# Todos os logs de um trace específico
-{job=~"frontend-service|backend-service"} | json | trace_id="abc123def456"
+### Visualização de logs:
+```bash
+# Ver logs do frontend
+docker-compose -f docker-compose-app.yml logs -f frontend
 
-# Logs de erro com trace_id
-{level="error"} | json | trace_id!=""
+# Ver logs do backend
+docker-compose -f docker-compose-app.yml logs -f backend
 
-# Logs de operações de banco
-{job="backend-service"} |= "database"
-
-# Logs de cache hits/misses
-{job="backend-service"} |= "cache"
-
-# Taxa de logs por serviço
-rate({job="frontend-service"}[5m])
+# Filtrar logs por trace_id
+docker-compose -f docker-compose-app.yml logs | grep "trace_id=abc123"
 ```
 
 ## Troubleshooting
@@ -202,18 +192,6 @@ curl http://localhost:5778/metrics
 
 # Testar conectividade com collector
 docker-compose -f docker-compose-app.yml exec jaeger-agent nc -zv JAEGER_COLLECTOR_IP 14250
-```
-
-### Logs não aparecem no Loki
-```bash
-# Verificar logs do Promtail
-docker-compose -f docker-compose-app.yml logs promtail
-
-# Verificar métricas do Promtail
-curl http://localhost:9080/metrics | grep promtail_sent_entries_total
-
-# Testar conectividade com Loki
-docker-compose -f docker-compose-app.yml exec promtail wget -qO- http://LOKI_SERVER_IP:3100/ready
 ```
 
 ### Performance e recursos

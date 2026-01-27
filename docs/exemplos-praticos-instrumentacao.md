@@ -613,8 +613,7 @@ Trace: external_api_call (3.5s) [retry.attempts_used=3, retry.success=true]
 
 1. Leia o [Guia Completo de Instrumentação](./instrumentation-guide.md)
 2. Use a [Referência Rápida](./quick-reference-instrumentacao.md) durante desenvolvimento
-3. Veja a [Correção de Propagação](./fix-trace-propagation.md) para troubleshooting
-4. Pratique com os exemplos acima
-5. Teste no Jaeger UI e veja os resultados!
+3. Pratique com os exemplos acima
+4. Teste no Jaeger UI e veja os resultados!
 
 **Boa instrumentação! 🚀**

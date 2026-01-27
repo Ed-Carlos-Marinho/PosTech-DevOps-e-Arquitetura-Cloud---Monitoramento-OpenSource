@@ -1189,4 +1189,4 @@ http://IP_INSTANCIA_1:16686
 - [Documentação Jaeger](https://www.jaegertracing.io/docs/)
 - [OpenTracing Specification](https://opentracing.io/specification/)
 - [Guia de Tracing Distribuído](./tracing-guide.md)
-- [Correção de Propagação de Contexto](./fix-trace-propagation.md)
+- [Referência Rápida](./quick-reference-instrumentacao.md)

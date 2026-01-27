@@ -69,7 +69,8 @@ Stack de aplicações distribuídas para Instância 2:
 2. [Exemplos Práticos](docs/exemplos-praticos-instrumentacao.md) - Código antes/depois
 
 **Avançado - Preciso resolver um problema:**
-1. [Correção de Propagação](docs/fix-trace-propagation.md) - Troubleshooting
+1. [Guia de Instrumentação](docs/instrumentation-guide.md) - Seção de troubleshooting
+2. [Referência Rápida](docs/quick-reference-instrumentacao.md) - Troubleshooting rápido
 
 ---
 
@@ -84,7 +85,8 @@ Stack de aplicações distribuídas para Instância 2:
 - [Exemplos Práticos](docs/exemplos-praticos-instrumentacao.md) - Comparações lado a lado 🆕
 
 ### 🐛 Troubleshooting
-- [Correção de Propagação](docs/fix-trace-propagation.md) - Correção de propagação de contexto 🆕
+- [Guia de Instrumentação](docs/instrumentation-guide.md) - Seção completa de troubleshooting
+- [Referência Rápida](docs/quick-reference-instrumentacao.md) - Troubleshooting rápido
 
 ## Como usar
 
@@ -121,9 +123,25 @@ curl http://localhost/api/products
 ```
 
 ### 3. Configurar Data Source no Grafana
-1. **Jaeger**: `http://jaeger:16686`
+1. Acessar Grafana: `http://IP_INSTANCIA_1:3000` (admin/admin123)
+2. Adicionar data source **Jaeger**: `http://jaeger:16686`
+3. Explorar traces diretamente no Jaeger UI: `http://IP_INSTANCIA_1:16686`
 
 ### 4. Testar aplicações e gerar traces
+
+**Geração Automática:**
+O serviço `trace-generator` gera traces automaticamente a cada 15 segundos.
+
+```bash
+# Ver logs do gerador
+docker-compose -f docker-compose-app.yml logs -f trace-generator
+
+# Parar/iniciar gerador
+docker-compose -f docker-compose-app.yml stop trace-generator
+docker-compose -f docker-compose-app.yml start trace-generator
+```
+
+**Geração Manual:**
 ```bash
 # Requisições simples
 curl http://localhost/api/users

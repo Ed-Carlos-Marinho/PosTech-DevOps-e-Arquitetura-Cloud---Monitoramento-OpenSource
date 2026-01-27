@@ -467,13 +467,13 @@ open http://IP_INSTANCIA_1:16686
 
 ---
 
-## 📚 Links Úteis
+## 📚 Recursos Adicionais
 
 - [Documentação Jaeger](https://www.jaegertracing.io/docs/)
 - [OpenTracing API](https://opentracing.io/docs/)
 - [Guia Completo de Instrumentação](./instrumentation-guide.md)
 - [Guia de Tracing Distribuído](./tracing-guide.md)
-- [Correção de Propagação](./fix-trace-propagation.md)
+- [Exemplos Práticos](./exemplos-praticos-instrumentacao.md)
 
 ---
 

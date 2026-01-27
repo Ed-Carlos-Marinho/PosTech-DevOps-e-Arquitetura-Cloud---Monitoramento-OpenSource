@@ -198,6 +198,55 @@ services:
       - app-network
     restart: unless-stopped
 
+  # ---------------------------------------------------------------------------
+  # TRACE GENERATOR - Gera traces automaticamente para demonstração
+  # ---------------------------------------------------------------------------
+  trace-generator:
+    image: curlimages/curl:latest
+    container_name: trace-generator
+    
+    # Script que faz requisições periódicas
+    command: >
+      sh -c '
+        echo "🚀 Trace Generator iniciado - aguardando serviços..."
+        sleep 30
+        echo "✅ Iniciando geração de traces..."
+        
+        while true; do
+          echo "📊 [$(date +%H:%M:%S)] Gerando traces..."
+          
+          # GET /api/users
+          curl -s -o /dev/null -w "Users: %{http_code}\n" http://frontend:3000/api/users
+          sleep 2
+          
+          # GET /api/products
+          curl -s -o /dev/null -w "Products: %{http_code}\n" http://frontend:3000/api/products
+          sleep 2
+          
+          # GET /api/orders
+          curl -s -o /dev/null -w "Orders: %{http_code}\n" http://frontend:3000/api/orders
+          sleep 3
+          
+          # POST /api/orders (criar pedido)
+          curl -s -o /dev/null -w "Create Order: %{http_code}\n" \
+            -X POST http://frontend:3000/api/orders \
+            -H "Content-Type: application/json" \
+            -d "{\"user_id\": $$((RANDOM % 10 + 1)), \"total_amount\": $$((RANDOM % 500 + 50))}"
+          
+          echo "⏳ Aguardando 15 segundos antes do próximo ciclo..."
+          sleep 15
+        done
+      '
+    
+    networks:
+      - app-network
+    restart: unless-stopped
+    
+    # Aguarda frontend estar disponível
+    depends_on:
+      - frontend
+      - backend
+
 # -----------------------------------------------------------------------------
 # VOLUMES PERSISTENTES - Para manter dados entre reinicializações
 # -----------------------------------------------------------------------------
@@ -227,16 +276,25 @@ networks:
 #    - RabbitMQ Management: http://IP_INSTANCIA_2:15672 (guest/guest)
 #    - Jaeger Agent Metrics: http://IP_INSTANCIA_2:5778/metrics
 #
-# 3. Para gerar traces de teste:
+# 3. Geração automática de traces:
+#    O serviço trace-generator gera traces automaticamente a cada 15 segundos
+#    Para ver logs: docker-compose -f docker-compose-app.yml logs -f trace-generator
+#
+# 4. Para gerar traces manualmente:
 #    curl http://IP_INSTANCIA_2/api/users
 #    curl http://IP_INSTANCIA_2/api/orders
 #    curl http://IP_INSTANCIA_2/api/products
 #
-# 4. Para ver logs:
+# 5. Para ver logs:
 #    docker-compose -f docker-compose-app.yml logs -f frontend
 #    docker-compose -f docker-compose-app.yml logs -f backend
+#    docker-compose -f docker-compose-app.yml logs -f trace-generator
 #
-# 5. Para parar a stack:
+# 6. Para parar/iniciar o gerador de traces:
+#    docker-compose -f docker-compose-app.yml stop trace-generator
+#    docker-compose -f docker-compose-app.yml start trace-generator
+#
+# 7. Para parar a stack:
 #    docker-compose -f docker-compose-app.yml down
 # =============================================================================
 #

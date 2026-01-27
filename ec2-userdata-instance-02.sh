@@ -112,11 +112,6 @@ ufw allow http                              # Permite HTTP (porta 80) - para fro
 ufw allow 5000                              # Permite Backend API
 ufw allow 15672                             # Permite RabbitMQ Management UI
 check_status "Configuração do firewall"
-ufw allow http                              # Permite HTTP (porta 80) - para frontend
-ufw allow 5000                              # Permite Backend API
-ufw allow 9080                              # Permite Promtail (métricas)
-ufw allow 15672                             # Permite RabbitMQ Management UI
-check_status "Configuração do firewall"
 
 # =============================================================================
 # FASE 8: VERIFICAÇÃO FINAL
