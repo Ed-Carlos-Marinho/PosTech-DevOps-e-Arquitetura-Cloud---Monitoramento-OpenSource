@@ -58,10 +58,33 @@ Stack de aplicações distribuídas para Instância 2:
 
 ## Arquivos de Documentação
 
-- `docs/ec2-userdata.md` - Guia detalhado dos scripts de user data
-- `docs/setup-ec2-instances.md` - Passo a passo completo para criar as instâncias EC2
-- `docs/tracing-guide.md` - Guia completo de tracing distribuído
-- `docs/instrumentation-guide.md` - Guia de instrumentação de aplicações
+### 🎯 Por Onde Começar?
+
+**Iniciante - Nunca usei Jaeger:**
+1. [Guia de Tracing Distribuído](docs/tracing-guide.md) - Conceitos fundamentais
+2. [Guia de Instrumentação](docs/instrumentation-guide.md) - Prática completa
+
+**Intermediário - Já conheço os conceitos:**
+1. [Referência Rápida](docs/quick-reference-instrumentacao.md) - Templates prontos
+2. [Exemplos Práticos](docs/exemplos-praticos-instrumentacao.md) - Código antes/depois
+
+**Avançado - Preciso resolver um problema:**
+1. [Correção de Propagação](docs/fix-trace-propagation.md) - Troubleshooting
+
+---
+
+### 📚 Guias Principais
+- [Setup de Instâncias EC2](docs/setup-ec2-instances.md) - Passo a passo completo para criar as instâncias EC2
+- [Guia de Tracing Distribuído](docs/tracing-guide.md) - Guia completo de tracing distribuído
+- [Scripts de User Data](docs/ec2-userdata.md) - Guia detalhado dos scripts de user data
+
+### 🔧 Instrumentação (ATUALIZADOS ✨)
+- [Guia de Instrumentação](docs/instrumentation-guide.md) - Guia completo com exemplos educacionais
+- [Referência Rápida](docs/quick-reference-instrumentacao.md) - Cola para consulta durante desenvolvimento 🆕
+- [Exemplos Práticos](docs/exemplos-praticos-instrumentacao.md) - Comparações lado a lado 🆕
+
+### 🐛 Troubleshooting
+- [Correção de Propagação](docs/fix-trace-propagation.md) - Correção de propagação de contexto 🆕
 
 ## Como usar
 
