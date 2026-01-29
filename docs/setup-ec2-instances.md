@@ -179,7 +179,7 @@ aws ec2 run-instances \
 Após criar as duas instâncias, clone o repositório para ter acesso aos arquivos necessários:
 
 ```bash
-git clone -b aula-02 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git
+git clone -b aula-02 https://github.com/Ed-Carlos-Marinho/PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource.git PosTech
 cd PosTech-DevOps-e-Arquitetura-Cloud---Monitoramento-OpenSource
 ```
 
