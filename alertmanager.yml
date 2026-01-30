@@ -51,7 +51,6 @@ receivers:
   - name: 'email-notifications'
     email_configs:
       - to: 'admin@example.com'                 # Email destinatário (AJUSTAR)
-        subject: 'Grafana Alert: {{ .GroupLabels.alertname }}'  # Assunto do email
         # Corpo do email com template Go (compatível com Grafana)
         html: |
           <h2>🚨 Alerta do Sistema de Monitoramento</h2>
